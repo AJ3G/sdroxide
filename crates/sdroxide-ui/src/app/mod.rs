@@ -303,6 +303,10 @@ pub struct SdroxideApp {
     /// the whole station: every radio tab holds the same one.
     alerts: alerts::AlertRuntime,
     radio_cfg: Option<sdroxide_types::RadioConfig>,
+    /// The config of the radio lent to this one as its panadapter receiver,
+    /// by id: its diversity filter is the one this radio's DIV box drives
+    /// (#637). Loaded once per lender rather than every frame.
+    div_lender: Option<(u32, sdroxide_types::RadioConfig)>,
     /// The converter offset being typed on the Radio tab, in Hz. Held apart
     /// from `radio_cfg` because every other field on that tab is written to
     /// `radio.json` as it is typed, and the engine rereads that file whenever it
@@ -1366,6 +1370,7 @@ impl SdroxideApp {
             speech_voices: Vec::new(),
             alerts: alerts::AlertRuntime::station(load_alerts_settings(storage)),
             radio_cfg: None,
+            div_lender: None,
             converter_edit_hz: None,
             range_edit: None,
             rx_site_edit: None,

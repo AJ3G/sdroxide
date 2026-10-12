@@ -4120,24 +4120,20 @@ impl SdroxideApp {
         if self.radio_cfg.is_none() {
             self.radio_cfg = self.ctrl.radio_config();
         }
-        let cfg = self.radio_cfg.as_ref()?;
-        match cfg.backend {
-            sdroxide_types::Backend::Lime => {
-                Some((cfg.lime.aux.mode, cfg.lime.aux.rate, cfg.lime.aux.frozen))
-            }
-            sdroxide_types::Backend::SdrPlay => {
-                Some((cfg.sdrplay.duo.mode, cfg.sdrplay.duo.rate, cfg.sdrplay.duo.frozen))
-            }
-            // Fobos's own filter only exists on FobosPort::HfDual — every
-            // other port has nothing to combine, and `caps.diversity` (set
-            // from that same port choice) already keeps the box off screen
-            // for them, so no port check is needed here too.
-            sdroxide_types::Backend::Fobos => {
-                Some((cfg.fobos.div_mode, cfg.fobos.div_rate, cfg.fobos.div_frozen))
-            }
-            // Every other interface with a second receiver keeps them apart.
-            _ => None,
+        div_settings(self.div_source_cfg()?)
+    }
+
+    /// Whose diversity filter this radio's DIV box drives: the receiver lent
+    /// to it as its panadapter, if it borrows one, else its own (#637). The
+    /// borrowing radio is a CAT rig, whose own config has no filter in it, so
+    /// the box never showed there.
+    fn div_source_cfg(&mut self) -> Option<&sdroxide_types::RadioConfig> {
+        let lender = self.radio_cfg.as_ref()?.panadapter.source_radio;
+        let Some(id) = lender else { return self.radio_cfg.as_ref() };
+        if self.div_lender.as_ref().map(|(i, _)| *i) != Some(id) {
+            self.div_lender = self.ctrl.lender_radio_config(id).map(|c| (id, c));
         }
+        self.div_lender.as_ref().map(|(_, c)| c)
     }
 
     /// Change the filter and remember the change.
@@ -4145,37 +4141,34 @@ impl SdroxideApp {
     /// Two messages, and both are wanted: the pseudo-gain reaches the running
     /// filter now, and the configuration is what it comes back as after a
     /// reconnect. Saving without reopening is exactly what the settings
-    /// dialog's own live controls do.
+    /// dialog's own live controls do. A borrowed receiver's filter is saved
+    /// to its own radio, not to this one's.
     fn div_edit(&mut self, cmds: &mut Vec<Command>, element: &str, db: f64) {
         cmds.push(Command::SetGain { dir: Direction::Rx, element: element.to_string(), db });
         // A restart is momentary — there is nothing about it to remember.
         if element == DIV_RESET_ELEMENT {
             return;
         }
-        let Some(cfg) = self.radio_cfg.as_mut() else { return };
-        let (mode, rate, frozen) = match cfg.backend {
-            sdroxide_types::Backend::Lime => {
-                let a = &mut cfg.lime.aux;
-                (&mut a.mode, &mut a.rate, &mut a.frozen)
-            }
-            sdroxide_types::Backend::SdrPlay => {
-                let d = &mut cfg.sdrplay.duo;
-                (&mut d.mode, &mut d.rate, &mut d.frozen)
-            }
-            sdroxide_types::Backend::Fobos => {
-                (&mut cfg.fobos.div_mode, &mut cfg.fobos.div_rate, &mut cfg.fobos.div_frozen)
-            }
-            _ => return,
+        let lender = self.radio_cfg.as_ref().and_then(|c| c.panadapter.source_radio);
+        let cfg = match lender {
+            Some(id) => match self.div_lender.as_mut() {
+                Some((i, c)) if *i == id => c,
+                _ => return,
+            },
+            None => match self.radio_cfg.as_mut() {
+                Some(c) => c,
+                None => return,
+            },
         };
-        match element {
-            DIV_MODE_ELEMENT => {
-                *mode = if db >= 0.5 { DiversityMode::Combine } else { DiversityMode::Cancel }
-            }
-            DIV_RATE_ELEMENT => *rate = db as f32,
-            DIV_FREEZE_ELEMENT => *frozen = db >= 0.5,
-            _ => return,
+        if !set_div_setting(cfg, element, db) {
+            return;
         }
-        cmds.push(Command::SetRadioConfig { cfg: Box::new(cfg.clone()), reopen: false });
+        match lender {
+            Some(id) => self.ctrl.set_lender_radio_config(id, cfg.clone()),
+            None => {
+                cmds.push(Command::SetRadioConfig { cfg: Box::new(cfg.clone()), reopen: false })
+            }
+        }
     }
 
     /// The DIV box: the diversity filter, on the strip because it is worked
@@ -7136,6 +7129,56 @@ fn readout_digit_count(
     let earns_extra =
         range_reaches_10ghz || converter_offset_hz.abs() >= 9e9 || active_freq_hz >= 1e10;
     if earns_extra { freq_display::DIGITS_EXT } else { freq_display::DIGITS }
+}
+
+/// The diversity filter's settings in a radio's config: mode, rate, frozen.
+/// `None` for an interface whose second receiver is kept apart.
+fn div_settings(cfg: &sdroxide_types::RadioConfig) -> Option<(DiversityMode, f32, bool)> {
+    match cfg.backend {
+        sdroxide_types::Backend::Lime => {
+            Some((cfg.lime.aux.mode, cfg.lime.aux.rate, cfg.lime.aux.frozen))
+        }
+        sdroxide_types::Backend::SdrPlay => {
+            Some((cfg.sdrplay.duo.mode, cfg.sdrplay.duo.rate, cfg.sdrplay.duo.frozen))
+        }
+        // Fobos's own filter only exists on FobosPort::HfDual — every other
+        // port has nothing to combine, and `caps.diversity` (set from that same
+        // port choice) already keeps the box off screen for them, so no port
+        // check is needed here too.
+        sdroxide_types::Backend::Fobos => {
+            Some((cfg.fobos.div_mode, cfg.fobos.div_rate, cfg.fobos.div_frozen))
+        }
+        // Every other interface with a second receiver keeps them apart.
+        _ => None,
+    }
+}
+
+/// Write one DIV control's value into a radio's config. False when there is
+/// nothing to remember: no filter on this interface, or not a setting.
+fn set_div_setting(cfg: &mut sdroxide_types::RadioConfig, element: &str, db: f64) -> bool {
+    let (mode, rate, frozen) = match cfg.backend {
+        sdroxide_types::Backend::Lime => {
+            let a = &mut cfg.lime.aux;
+            (&mut a.mode, &mut a.rate, &mut a.frozen)
+        }
+        sdroxide_types::Backend::SdrPlay => {
+            let d = &mut cfg.sdrplay.duo;
+            (&mut d.mode, &mut d.rate, &mut d.frozen)
+        }
+        sdroxide_types::Backend::Fobos => {
+            (&mut cfg.fobos.div_mode, &mut cfg.fobos.div_rate, &mut cfg.fobos.div_frozen)
+        }
+        _ => return false,
+    };
+    match element {
+        DIV_MODE_ELEMENT => {
+            *mode = if db >= 0.5 { DiversityMode::Combine } else { DiversityMode::Cancel }
+        }
+        DIV_RATE_ELEMENT => *rate = db as f32,
+        DIV_FREEZE_ELEMENT => *frozen = db >= 0.5,
+        _ => return false,
+    }
+    true
 }
 
 #[cfg(test)]

@@ -204,6 +204,16 @@ impl RadioController for LocalController {
         Some(self.store.load_radio_config())
     }
 
+    fn lender_radio_config(&self, id: u32) -> Option<RadioConfig> {
+        Some(sdroxide_config::Store::radio(id).load_radio_config())
+    }
+
+    fn set_lender_radio_config(&mut self, id: u32, cfg: RadioConfig) {
+        if let Err(e) = sdroxide_config::Store::radio(id).save_radio_config(&cfg) {
+            warn!("saving radio {}'s config: {e}", id + 1);
+        }
+    }
+
     fn set_radio_config(&mut self, cfg: RadioConfig) {
         // Persist now; `reopen_source` applies it to the running engine.
         if let Err(e) = self.store.save_radio_config(&cfg) {
