@@ -1523,7 +1523,12 @@ use sdroxide_types::{
 /// `Command::SetNetworkConfig` whole, so a v173 peer reads the extra bytes as
 /// the start of the next field and fails to decode the config — the same break
 /// as every appended field before it.
-pub const PROTO_VERSION: u16 = 174;
+///
+/// v175: decoded CW over UDP. [`sdroxide_types::WsjtxConfig`] gains `cw_text`
+/// ([`sdroxide_types::CwTextConfig`]) on its tail, beside the N1MM broadcast it
+/// sits with. `WsjtxConfig` rides `Command::SetWsjtxConfig` whole, so a v174
+/// peer handed one reads the extra bytes as the start of the next message.
+pub const PROTO_VERSION: u16 = 175;
 const VERSION_BYTE: u8 = 0x12;
 
 #[derive(Debug, thiserror::Error)]
