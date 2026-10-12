@@ -12285,8 +12285,9 @@ like PTT does.
 moves — as 0 to 1 across that stage's range, landing on its own steps. A radio
 with no RX gain the software can set has no `RF` level and does not advertise
 one. On a PlutoSDR whose own AGC is running, the part ignores the setting, as
-it ignores the slider. `SQL` is the squelch threshold, 0 open to 1 closed. `AGC`
-is Hamlib's `RIG_AGC_*` number: 0 off, 2 fast, 5 medium, 3 slow. The `NR` level
+it ignores the slider. `SQL` is the squelch threshold, 0 open to 1 closed; on
+a radio whose own squelch sdroxide drives, it is that squelch. `AGC` is
+Hamlib's `RIG_AGC_*` number: 0 off, 2 fast, 5 medium, 3 slow. The `NR` level
 is the strength (a third, two thirds, 1 for low, medium, high) of the engine
 chosen in the NR panel, which it leaves alone.
 

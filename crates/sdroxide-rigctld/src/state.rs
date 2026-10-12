@@ -41,6 +41,11 @@ pub struct RigState {
     /// Squelch threshold in dBFS, reported as Hamlib's `SQL` (0.0 open ..=
     /// 1.0 closed) — see [`RigState::sql_level`].
     pub squelch_db: f32,
+    /// The radio's own squelch, 0..=1, on a radio whose squelch sdroxide sets
+    /// (`DeviceCaps::commands_squelch`). `SQL` is that one there: the engine's
+    /// gate is not on screen for such a radio, so closing it over rigctl would
+    /// mute the audio with no control left to open it.
+    pub rig_squelch: Option<f32>,
     /// AGC setting, reported as Hamlib's `AGC` — see [`agc_to_hamlib`].
     pub agc: AgcMode,
     /// The receiver's front-end gain — the stage the top bar's Gain slider
@@ -80,6 +85,7 @@ impl Default for RigState {
             nr_level: NrLevel::Off,
             auto_notch: false,
             squelch_db: SQUELCH_OPEN_DB,
+            rig_squelch: None,
             agc: AgcMode::Med,
             rf_gain: None,
             can_tx: false,
@@ -213,8 +219,10 @@ pub fn agc_from_hamlib(v: i32) -> Option<AgcMode> {
     Some(match v {
         0 => AgcMode::Off,
         1 | 2 => AgcMode::Fast,
-        3 => AgcMode::Slow,
-        4..=6 => AgcMode::Med,
+        // 7 is LONG, Hamlib 4's slowest.
+        3 | 7 => AgcMode::Slow,
+        // 8 is ON: AGC on at whatever the radio's default is.
+        4..=6 | 8 => AgcMode::Med,
         _ => return None,
     })
 }

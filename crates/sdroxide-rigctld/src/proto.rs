@@ -334,7 +334,9 @@ fn dispatch(
     if st.nr_level.is_on() {
         sess.nr_last = Some(st.nr_level);
     }
-    let num = |i: usize| args.get(i).and_then(|s| s.parse::<f64>().ok());
+    // `nan` and `inf` parse, and a clamp leaves NaN as it is: one would reach
+    // the hardware (and the saved settings) as a gain or squelch of NaN.
+    let num = |i: usize| args.get(i).and_then(|s| s.parse::<f64>().ok()).filter(|v| v.is_finite());
     let int = |i: usize| args.get(i).and_then(|s| s.parse::<i32>().ok());
 
     match long {
@@ -461,7 +463,8 @@ fn dispatch(
                 out.finish(OK, true)
             }
             Some(l) if l == "SQL" => {
-                out.value("Level Value", format!("{:.6}", st.sql_level()));
+                let level = st.rig_squelch.unwrap_or_else(|| st.sql_level());
+                out.value("Level Value", format!("{level:.6}"));
                 out.finish(OK, true)
             }
             // The strength running, or the one NR comes back on at.
@@ -509,7 +512,10 @@ fn dispatch(
                     out.finish(OK, false)
                 }
                 ("SQL", Some(v)) => {
-                    cmds.push(Command::SetSquelch { rx: RxId::Main, db: squelch_db_for(v) });
+                    cmds.push(match st.rig_squelch {
+                        Some(_) => Command::SetRigSquelch { frac: v.clamp(0.0, 1.0) as f32 },
+                        None => Command::SetSquelch { rx: RxId::Main, db: squelch_db_for(v) },
+                    });
                     out.finish(OK, false)
                 }
                 // The strength only: the engine stays the one chosen. While
@@ -721,10 +727,13 @@ fn set_mode(args: &[&str], st: &RigState, cmds: &mut Vec<Command>, out: Out) -> 
             && !name.to_ascii_uppercase().starts_with("PKT")
             && let Some(w) = args.get(1).and_then(|s| s.parse::<i32>().ok())
             && w > 0
-            && w != st.passband_hz()
         {
+            // Compared as applied: `filter_for` clamps, so a client re-sending
+            // a width out of range would otherwise re-set the filter each time.
             let (lo, hi) = filter_for(mode, w);
-            cmds.push(Command::SetFilter { rx: RxId::Main, lo, hi });
+            if (hi - lo).round() as i32 != st.passband_hz() {
+                cmds.push(Command::SetFilter { rx: RxId::Main, lo, hi });
+            }
         }
         return out.finish(OK, false);
     }
@@ -1085,6 +1094,26 @@ mod tests {
             vec![Command::SetAgc { rx: RxId::Main, agc: AgcMode::Med }]
         );
         assert_eq!(run_with("L AGC 9", &s, &cfg).0, "RPRT -1\n");
+    }
+
+    /// A radio whose own squelch sdroxide drives: `SQL` is that squelch, and
+    /// the engine's gate (not on screen for such a radio) is left alone.
+    #[test]
+    fn sql_drives_the_radios_own_squelch_where_it_has_one() {
+        let s = RigState { rig_squelch: Some(0.25), ..st() };
+        let cfg = RigctldConfig::default();
+        assert_eq!(run_with("l SQL", &s, &cfg).0, "0.250000\n");
+        assert_eq!(run_with("L SQL 0.5", &s, &cfg).1, vec![Command::SetRigSquelch { frac: 0.5 }]);
+    }
+
+    /// `nan` parses as a float; it must not reach a gain or a squelch.
+    #[test]
+    fn a_non_finite_level_is_refused() {
+        let s = with_gain();
+        let cfg = RigctldConfig::default();
+        for cmd in ["L RF nan", "L SQL nan", "L AF inf"] {
+            assert!(run_with(cmd, &s, &cfg).1.is_empty(), "{cmd}");
+        }
     }
 
     /// An RTL-SDR's tuner stage: 0..=49.6 dB in 0.1 dB steps, set at 29.7.

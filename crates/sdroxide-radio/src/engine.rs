@@ -4981,6 +4981,7 @@ struct RigDigest {
     auto_notch: bool,
     nr_level: sdroxide_types::NrLevel,
     squelch: u32,
+    rig_squelch: Option<u32>,
     agc: sdroxide_types::AgcMode,
     /// The front-end gain's setting and range, by bit pattern.
     rf_gain: Option<(u64, u64, u64)>,
@@ -5012,6 +5013,7 @@ impl RigDigest {
             auto_notch: s.auto_notch,
             nr_level: s.nr_level,
             squelch: s.squelch_db.to_bits(),
+            rig_squelch: s.rig_squelch.map(f32::to_bits),
             agc: s.agc,
             rf_gain: s
                 .rf_gain
@@ -11411,6 +11413,7 @@ impl Engine {
             nr_level: rx.noise_reduction,
             auto_notch: rx.auto_notch,
             squelch_db: rx.squelch_db,
+            rig_squelch: self.caps.commands_squelch.then_some(self.state.rig_squelch),
             agc: rx.agc,
             rf_gain: self.rigctld_rf_gain().map(|(g, value)| sdroxide_rigctld::RfGain {
                 element: g.name.clone(),
@@ -11481,6 +11484,7 @@ impl Engine {
             auto_notch: rx.auto_notch,
             nr_level: rx.noise_reduction,
             squelch: rx.squelch_db.to_bits(),
+            rig_squelch: self.caps.commands_squelch.then_some(self.state.rig_squelch.to_bits()),
             agc: rx.agc,
             rf_gain: self
                 .rigctld_rf_gain()
