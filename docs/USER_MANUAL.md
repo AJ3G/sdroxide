@@ -7380,6 +7380,16 @@ sub receiver on the right), or to the **left** or **right** channel only — two
 radios on one headset, one in each ear. A sub receiver is then mixed into the
 same ear. Recordings are not affected. Applies at once.
 
+**Gain per band** — on by default — gives each band back the receive gain you
+last set on it when the dial returns there, however it got there: a band
+button, a drag across a band edge, or the radio's own knob. General coverage
+counts as four ranges (HF, VHF, UHF and above), so short-wave broadcast and the
+airband keep their own. A band you have never set a gain on keeps whatever is
+in force. Only the gain stages are remembered, not AGC switches or a bias tee.
+The gain sliders on some radios' own setup pages (RTL-SDR, RX-888) show the
+figure saved there rather than the one in force; the gain controls on the strip
+show the live one. Untick it for one gain everywhere.
+
 **S-meter calibration** is added to this radio's S-meter reading, and applies as
 you drag it; see [2.9](#29-the-s-meter) for why an SDR needs it.
 

@@ -1537,7 +1537,11 @@ use sdroxide_types::{
 /// v177: [`sdroxide_types::RadioConfig`] gains `audio_route`
 /// ([`sdroxide_types::AudioRoute`], a unit enum) on its tail — which speaker
 /// channels the radio plays to (issue #654). Same break as v176.
-pub const PROTO_VERSION: u16 = 177;
+///
+/// v178: [`sdroxide_types::RadioConfig`] gains `same_gain_all_bands` (`bool`)
+/// on its tail — the switch for remembering receive gain per band (issue #605).
+/// Same break as v176.
+pub const PROTO_VERSION: u16 = 178;
 const VERSION_BYTE: u8 = 0x12;
 
 #[derive(Debug, thiserror::Error)]
@@ -2546,6 +2550,7 @@ mod tests {
             // cannot pass this by reading zeros.
             s_meter_cal_db: -42.5,
             audio_route: sdroxide_types::AudioRoute::Right,
+            same_gain_all_bands: true,
             // The transmit converter is an enum with a payload on one variant
             // only — the shape a self-describing format forgives and postcard
             // does not, so it is carried here rather than left at its default.

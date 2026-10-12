@@ -2255,6 +2255,27 @@ impl SdroxideApp {
                     }
                     ui.end_row();
 
+                    // #605: an RTL-SDR wants little gain on HF and a lot on 2 m.
+                    ui.label(RichText::new("Gain per band").strong());
+                    let mut per_band = !cfg.same_gain_all_bands;
+                    if crate::chrome::checkbox(ui, &mut per_band, "Remember receive gain per band")
+                        .on_hover_text(
+                            "Each band keeps the receive gain you last set on it, and gets it \
+                             back when the dial returns — a band button, a drag across a band \
+                             edge or the radio's own knob. General coverage is split into HF, \
+                             VHF, UHF and above. A band you have not set a gain on keeps \
+                             whatever is in force. Off: one gain everywhere.",
+                        )
+                        .changed()
+                    {
+                        cfg.same_gain_all_bands = !per_band;
+                        cmds.push(Command::SetRadioConfig {
+                            cfg: Box::new(cfg.clone()),
+                            reopen: false,
+                        });
+                    }
+                    ui.end_row();
+
                     // Live, like the receive audio trim: it is set by watching
                     // the S-meter while dragging (#642).
                     ui.label(RichText::new("S-meter calibration").strong());

@@ -1460,6 +1460,19 @@ struct StereoMixer {
     route: sdroxide_types::AudioRoute,
 }
 
+/// Which slot of [`Engine::band_gains`] a dial belongs to: the band's name,
+/// or for general coverage the range — HF broadcast and the airband are not
+/// one gain (#605). Names, never `Band::index`, which moves on insert.
+fn gain_slot(band: Band, hz: f64) -> String {
+    match band {
+        Band::Gen if hz < 30e6 => "GEN_HF".into(),
+        Band::Gen if hz < 300e6 => "GEN_VHF".into(),
+        Band::Gen if hz < 3e9 => "GEN_UHF".into(),
+        Band::Gen => "GEN_SHF".into(),
+        b => format!("{b:?}"),
+    }
+}
+
 /// One output frame on its way to the speakers, sent where `route` says. With
 /// a sub receiver the two are mixed into the one ear rather than one dropped.
 fn route_frame(route: sdroxide_types::AudioRoute, l: f32, r: f32, dual: bool) -> (f32, f32) {
@@ -3078,6 +3091,14 @@ struct Engine {
     /// [`sdroxide_config::Session::band_antenna`] and
     /// [`Engine::follow_band_antenna`].
     band_antenna: sdroxide_config::BandAntennas,
+    /// The receive gain stages last set on each band. See
+    /// [`sdroxide_config::Session::band_gains`] and [`Engine::poll_gain_slot`].
+    band_gains: sdroxide_config::BandGains,
+    /// The [`gain_slot`] the dial was in at the last check.
+    gain_slot_seen: String,
+    /// Whether gains follow the band —
+    /// `!RadioConfig::same_gain_all_bands`.
+    gain_per_band: bool,
     /// The front-end gain stages the operator has set, RX then TX, as
     /// `(element, dB)` — held for the same reason [`Self::want_antenna`] is,
     /// and applied by [`Engine::restore_gains`] after every open.
@@ -4014,6 +4035,8 @@ fn engine_thread(
     let want_gains =
         session.as_ref().map(|s| (s.gains.clone(), s.tx_gains.clone())).unwrap_or_default();
     let band_antenna = session.as_ref().map(|s| s.band_antenna.clone()).unwrap_or_default();
+    let band_gains = session.as_ref().map(|s| s.band_gains.clone()).unwrap_or_default();
+    let gain_slot_seen = gain_slot(state.band, state.active_freq_hz());
     // Taken before the state is moved into the engine. Both VFOs open on the
     // mode the receiver came up in — the command line's, the session's, or the
     // default — and the *inactive* one is then given back the mode it was
@@ -4280,6 +4303,9 @@ fn engine_thread(
         session,
         want_antenna,
         band_antenna,
+        band_gains,
+        gain_slot_seen,
+        gain_per_band: !radio_cfg.same_gain_all_bands,
         want_gains,
         want_decimation,
         store: engine_cfg.store,
@@ -4569,6 +4595,7 @@ fn engine_thread(
         engine.poll_tci_server();
         engine.poll_rigctld();
         engine.poll_band_change();
+        engine.poll_gain_slot();
         engine.wsjtx_heartbeat();
         engine.poll_spots();
         engine.poll_winlink();
@@ -8558,6 +8585,7 @@ impl Engine {
                         warn!("set RX gain {element}: {e}");
                     }
                     self.state.gains = self.source.current_gains();
+                    self.remember_band_gain(&element, db);
                     self.remember_gain(dir, element, db);
                     // An RSPdx's HDR switch rides a gain element and changes
                     // which LNA table is in force.
@@ -9881,6 +9909,7 @@ impl Engine {
                 // listening to the radio while they drag the control.
                 self.rx_af_gain_db = cfg.rx_audio_gain_db;
                 self.audio_route = cfg.audio_route;
+                self.gain_per_band = !cfg.same_gain_all_bands;
                 self.refresh_af_trim();
                 // And the S-meter calibration, live for the same reason: it is
                 // set by watching the meter while dragging the control.
@@ -14302,6 +14331,65 @@ impl Engine {
     /// where the two differ: a driver that quantises 33.7 dB to its 1 dB grid
     /// should be remembered on the step it actually went to, or every restart
     /// would re-send a figure it never held.
+    /// Note a receive gain against the band it was set on (#605). Only the real
+    /// stages the front end publishes: AGC switches, bias tees and the other
+    /// settings that ride `SetGain` are not a band's business.
+    fn remember_band_gain(&mut self, element: &str, db: f64) {
+        if !self.gain_per_band
+            || !self.caps.gains.iter().any(|g| g.direction == Direction::Rx && g.name == element)
+        {
+            return;
+        }
+        let db = self.state.gains.iter().find(|(n, _)| n == element).map_or(db, |(_, d)| *d);
+        let slot = gain_slot(self.state.band, self.state.active_freq_hz());
+        let set = self.band_gains.entry(slot).or_default();
+        match set.iter_mut().find(|(n, _)| n == element) {
+            Some(s) => s.1 = db,
+            None => set.push((element.to_string(), db)),
+        }
+    }
+
+    /// Restore the receive gain last set on the band the dial has just moved
+    /// into (#605). Every band change comes through here — a band button, a
+    /// drag across an edge, the rig's own knob — because it watches where the
+    /// dial is rather than how it got there. A band with nothing remembered
+    /// keeps the gain in force: no preference, no assertion.
+    fn poll_gain_slot(&mut self) {
+        let slot = gain_slot(self.state.band, self.state.active_freq_hz());
+        if slot == self.gain_slot_seen {
+            return;
+        }
+        self.gain_slot_seen = slot.clone();
+        if !self.gain_per_band {
+            return;
+        }
+        let Some(set) = self.band_gains.get(&slot).cloned() else { return };
+        // The band's own ladder first (an RSP's LNA table changes with it), so
+        // the clamp below is against the stages this band really has.
+        self.refresh_rx_gains();
+        let mut touched = false;
+        for (name, db) in set {
+            let Some(g) =
+                self.caps.gains.iter().find(|g| g.direction == Direction::Rx && g.name == name)
+            else {
+                continue;
+            };
+            let db = db.clamp(g.min_db, g.max_db);
+            if let Err(e) = self.source.set_gain_element(&name, db) {
+                warn!("band gain {name}: {e}");
+            }
+            match self.want_gains.0.iter_mut().find(|(n, _)| *n == name) {
+                Some(s) => s.1 = db,
+                None => self.want_gains.0.push((name, db)),
+            }
+            touched = true;
+        }
+        if touched {
+            self.state.gains = self.source.current_gains();
+            let _ = self.event_tx.send(RadioEvent::State(self.state.clone()));
+        }
+    }
+
     fn remember_gain(&mut self, dir: Direction, element: String, db: f64) {
         let (want, actual) = match dir {
             Direction::Rx => (&mut self.want_gains.0, &self.state.gains),
@@ -14463,6 +14551,7 @@ impl Engine {
             tx_gains: self.want_gains.1.clone(),
             recording_mono: self.state.recording_mono,
             band_antenna: self.band_antenna.clone(),
+            band_gains: self.band_gains.clone(),
             // The shelf again, with the live socket written into the active
             // slot on the way past for the same reason the modes are.
             vfo_antennas: Some({
@@ -14598,6 +14687,9 @@ impl Engine {
         self.follow_band_antenna(self.state.band);
         self.want_gains = (s.gains.clone(), s.tx_gains.clone());
         self.restore_gains();
+        self.band_gains = s.band_gains.clone();
+        self.gain_slot_seen.clear();
+        self.poll_gain_slot();
 
         // The digital identity and the message templates. The engine-owned
         // fields (the per-band TX offset, the per-mode levels, the contest

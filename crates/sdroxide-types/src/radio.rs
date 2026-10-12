@@ -7469,6 +7469,11 @@ pub struct RadioConfig {
     /// Which speaker channels this radio's audio goes to. See [`AudioRoute`].
     /// `Both` in a configuration written before this existed. Appended last.
     pub audio_route: AudioRoute,
+    /// One receive gain on every band, as before #605. Off — the default — the
+    /// gain stages are remembered per band and restored as the dial crosses
+    /// into one; a band never set keeps whatever gain is in force. Appended
+    /// last.
+    pub same_gain_all_bands: bool,
 }
 
 impl RadioConfig {
