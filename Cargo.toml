@@ -43,6 +43,13 @@ license = "GPL-3.0-or-later"
 [profile.dev.package."*"]
 opt-level = 2
 
+# Rust 1.99 (LLVM) never finishes optimizing mfsk-core 0.10.0 at opt-level 3 for
+# aarch64 — the Linux and macOS ARM release jobs ran into the 6 h timeout from
+# 1 Oct 2026 on. At 2 it builds in under a minute. Profiles can't be per target,
+# so x86 gets the same; drop this once a toolchain no longer hangs.
+[profile.release.package.mfsk-core]
+opt-level = 2
+
 [profile.dev.package.sdroxide-dsp]
 opt-level = 2
 
