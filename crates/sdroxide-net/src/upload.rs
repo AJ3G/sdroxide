@@ -30,10 +30,8 @@ pub fn upload(
 /// QTH profile unless the target profile is named, so the nickname is sent only
 /// when the operator has set one and left off entirely otherwise (issue #647).
 fn eqsl_form_fields<'a>(cfg: &'a NetworkConfig, adif: &'a str) -> Vec<(&'a str, &'a str)> {
-    let mut fields = vec![
-        ("EQSL_USER", cfg.eqsl.user.trim()),
-        ("EQSL_PSWD", cfg.eqsl.password.trim()),
-    ];
+    let mut fields =
+        vec![("EQSL_USER", cfg.eqsl.user.trim()), ("EQSL_PSWD", cfg.eqsl.password.trim())];
     let qth = cfg.eqsl_qth_nickname.trim();
     if !qth.is_empty() {
         // eQSL's own spelling of the parameter.
@@ -41,6 +39,29 @@ fn eqsl_form_fields<'a>(cfg: &'a NetworkConfig, adif: &'a str) -> Vec<(&'a str, 
     }
     fields.push(("ADIFData", adif));
     fields
+}
+
+/// The records with eQSL's documented per-record profile tag,
+/// `APP_EQSL_QTH_NICKNAME`, before each `<EOR>` — the form field above is what
+/// was verified live, this is what eQSL's ImportADIF spec prefers. Left alone
+/// when no nickname is set or the log already names one.
+fn with_eqsl_qth(adif: &str, qth: &str) -> String {
+    let qth = qth.trim();
+    let upper = adif.to_ascii_uppercase();
+    if qth.is_empty() || upper.contains("<APP_EQSL_QTH_NICKNAME:") {
+        return adif.to_owned();
+    }
+    let tag = format!("<APP_EQSL_QTH_NICKNAME:{}>{}", qth.len(), qth);
+    let mut out = String::with_capacity(adif.len() + 32);
+    let mut last = 0;
+    // ASCII upper-casing keeps byte offsets, so the match indexes `adif` too.
+    for (i, _) in upper.match_indices("<EOR>") {
+        out.push_str(&adif[last..i]);
+        out.push_str(&tag);
+        last = i;
+    }
+    out.push_str(&adif[last..]);
+    out
 }
 
 /// The `&QTHNickname=…` an eQSL URL appends when the operator has set one.
@@ -52,18 +73,15 @@ fn eqsl_form_fields<'a>(cfg: &'a NetworkConfig, adif: &'a str) -> Vec<(&'a str, 
 /// when no nickname is set, so a single-profile account is unchanged.
 fn eqsl_qth_query(cfg: &NetworkConfig) -> String {
     let qth = cfg.eqsl_qth_nickname.trim();
-    if qth.is_empty() {
-        String::new()
-    } else {
-        format!("&QTHNickname={}", urlencode(qth))
-    }
+    if qth.is_empty() { String::new() } else { format!("&QTHNickname={}", urlencode(qth)) }
 }
 
 fn upload_eqsl(cfg: &NetworkConfig, adif: &str) -> Result<String, String> {
     if cfg.eqsl.user.trim().is_empty() {
         return Err("eQSL username/password not set".into());
     }
-    let fields = eqsl_form_fields(cfg, adif);
+    let adif = with_eqsl_qth(adif, &cfg.eqsl_qth_nickname);
+    let fields = eqsl_form_fields(cfg, &adif);
     let body = http::post_form("https://www.eqsl.cc/qslcard/importADIF.cfm", &fields)?;
     // eQSL returns HTML; success contains "Result: 1 out of 1 …". Errors carry
     // an "Error:" / "Warning:" line.
@@ -886,6 +904,19 @@ mod tests {
         let spaced = NetworkConfig { eqsl_qth_nickname: "My Home".into(), ..Default::default() };
         let q = eqsl_qth_query(&spaced);
         assert!(q.starts_with("&QTHNickname=") && !q.contains(' '), "encoded: {q}");
+    }
+
+    #[test]
+    fn the_eqsl_qth_nickname_is_tagged_on_every_record() {
+        let adif = "<EOH>\n<CALL:4>K1AB<EOR>\n<CALL:4>K2CD<eor>\n";
+        let tagged = with_eqsl_qth(adif, " Home ");
+        assert_eq!(
+            tagged,
+            "<EOH>\n<CALL:4>K1AB<APP_EQSL_QTH_NICKNAME:4>Home<EOR>\n\
+             <CALL:4>K2CD<APP_EQSL_QTH_NICKNAME:4>Home<eor>\n"
+        );
+        assert_eq!(with_eqsl_qth(adif, ""), adif, "blank: unchanged");
+        assert_eq!(with_eqsl_qth(&tagged, "Away"), tagged, "a log that names one keeps it");
     }
 
     #[test]

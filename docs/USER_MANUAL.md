@@ -12050,7 +12050,11 @@ stored in plaintext in `net.json`. How the features behave is
   rather than picking your fields out of all four services' at once.
   - **QRZ** — the **QRZ log key**, your QRZ *logbook* API key. Not the
     XML-lookup login above; the two are unrelated.
-  - **eQSL** — **eQSL user** and **pass**.
+  - **eQSL** — **eQSL user** and **pass**, and **eQSL QTH**: the QTH Nickname
+    of the profile to use, needed only by an account with more than one QTH
+    profile (eQSL refuses the login otherwise). It is sent on upload, on
+    **Test** and on the confirmation download; leave it blank for a single
+    profile.
   - **HamQTH** — **HamQTH user** and **pass**, which are the *same two boxes* as
     the ones under *Callsign lookup*. HamQTH issues one login per operator and
     its logbook authenticates with it, so type them into whichever pair you

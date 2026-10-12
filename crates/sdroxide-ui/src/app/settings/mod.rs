@@ -3208,9 +3208,9 @@ impl SdroxideApp {
                         net_row(ui, "eQSL QTH", &mut io.net_edit.eqsl_qth_nickname, 140.0);
                         ui.label(
                             RichText::new(
-                                "Which QTH profile an upload is filed into — needed only \
-                                 when the account owns more than one, and left blank \
-                                 otherwise.",
+                                "The QTH Nickname of the eQSL profile to upload to and \
+                                 download from — needed only when the account owns more \
+                                 than one; leave it blank otherwise.",
                             )
                             .size(10.5)
                             .color(crate::theme::gray(140)),
