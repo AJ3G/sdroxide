@@ -483,6 +483,18 @@ pub fn save_band_plan(plan: &sdroxide_types::BandPlan) -> Result<(), ConfigError
     write_atomic(&config_dir()?, BAND_PLAN_FILE, &plan.to_json_document())
 }
 
+/// The operator's own HFDL channels (`hfdl_channels.json`), in kHz — the busy
+/// assigned frequencies that are not in the published plan, kept as one-click
+/// chips beside it. Per machine rather than per station: a channel a listener
+/// found busy is theirs, not everybody else's.
+pub fn load_hfdl_channels() -> Vec<u32> {
+    load_json_list("hfdl_channels.json")
+}
+
+pub fn save_hfdl_channels(khz: &[u32]) -> Result<(), ConfigError> {
+    save_json("hfdl_channels.json", &khz)
+}
+
 /// Load just the remote-access credentials.
 ///
 /// Read fresh rather than cached: the server calls this once per connection, so
@@ -3224,6 +3236,13 @@ mod tests {
         // And it says so again next time, because the file is still wrong.
         assert!(load_band_plan().is_default());
         assert_eq!(take_load_alerts().len(), 1);
+
+        // The operator's own HFDL channels: a save writes the file and a load
+        // reads it back, and a missing one is simply empty (not an error).
+        assert!(load_hfdl_channels().is_empty(), "no file, no saved channels");
+        save_hfdl_channels(&[5_451, 8_843, 11_184]).unwrap();
+        assert!(root.join("hfdl_channels.json").exists());
+        assert_eq!(load_hfdl_channels(), vec![5_451, 8_843, 11_184]);
 
         unsafe { std::env::remove_var("SDROXIDE_CONFIG_DIR") };
     }

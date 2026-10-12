@@ -67,8 +67,8 @@ use self::panels::fsq::fsq_load_contacts;
 use self::panels::rf_paint::RfPaintUi;
 use self::panels::sstv::SstvUi;
 use self::persist::{
-    load_alerts_settings, load_broadcast_stations, load_morse_progress, load_qso_log,
-    load_speech_settings, load_ui_settings,
+    load_alerts_settings, load_broadcast_stations, load_hfdl_channels, load_morse_progress,
+    load_qso_log, load_speech_settings, load_ui_settings,
 };
 use self::settings::servers::TciServerStatus;
 use self::settings::{SatEditState, SettingsTab, TestOutcome};
@@ -450,6 +450,10 @@ pub struct SdroxideApp {
     /// HFDL: filter for the decode log; matches a kind, a ground station or the
     /// payload details.
     hfdl_filter: String,
+    /// The operator's own HFDL channels, in kHz (`hfdl_channels.json`) — the
+    /// busy assigned frequencies that are not in the published plan, drawn as
+    /// one-click chips beside it in the HFDL panel.
+    hfdl_channels: Vec<u32>,
     show_settings: bool,
     /// Scroll the Settings window back to its tab bar on the frame it opens.
     /// The window's scroll offset is egui memory, which outlives both the
@@ -1409,6 +1413,7 @@ impl SdroxideApp {
             hfdl_status: None,
             hfdl_map: crate::hfdl_map::HfdlMapState::default(),
             hfdl_filter: String::new(),
+            hfdl_channels: load_hfdl_channels(storage),
             show_settings: false,
             settings_scroll_top: true,
             voice: sdroxide_types::VoiceStatus::default(),
