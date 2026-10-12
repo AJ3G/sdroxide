@@ -2456,6 +2456,9 @@ struct Engine {
     /// card changes, and a rebuilt mixer has to be told again.
     /// See [`sdroxide_types::RadioConfig::rx_audio_gain_db`].
     rx_af_gain_db: f32,
+    /// See [`sdroxide_types::RadioConfig::s_meter_cal_db`]: this radio's S-meter
+    /// calibration, on top of the station's `cal_offset_db`.
+    radio_cal_db: f32,
     tx_center_hz: f64,
     tx_ham_only: bool,
     /// SWR guard: trip threshold, and the latch it sets.
@@ -4039,6 +4042,7 @@ fn engine_thread(
         drive_trim: radio_cfg.tx_drive_trim.clone(),
         tx_drive_max: radio_cfg.tx_drive_ceiling(),
         rx_af_gain_db: radio_cfg.rx_audio_gain_db,
+        radio_cal_db: radio_cfg.s_meter_cal_db,
         tx_center_hz: 0.0,
         tx_ham_only: engine_cfg.tx_ham_only,
         swr_guard: engine_cfg.swr_guard,
@@ -9852,6 +9856,9 @@ impl Engine {
                 // listening to the radio while they drag the control.
                 self.rx_af_gain_db = cfg.rx_audio_gain_db;
                 self.refresh_af_trim();
+                // And the S-meter calibration, live for the same reason: it is
+                // set by watching the meter while dragging the control.
+                self.radio_cal_db = cfg.s_meter_cal_db;
                 // Announced from the store rather than echoed from `cfg`, so
                 // what every client shows is what was actually written — a
                 // failed save leaves them on the configuration the radio is
@@ -13335,9 +13342,9 @@ impl Engine {
         }
         if let Some(p) = self.main.as_ref().and_then(|c| c.power_dbfs()) {
             let gain = self.source.rx_gain_db().unwrap_or(0.0);
-            return Some(p - gain + self.cal_offset_db);
+            return Some(p - gain + self.cal_offset_db + self.radio_cal_db);
         }
-        self.audio_mode.then(|| self.audio_level_dbfs() + self.cal_offset_db)
+        self.audio_mode.then(|| self.audio_level_dbfs() + self.cal_offset_db + self.radio_cal_db)
     }
 
     /// The smoothed level of audio that arrived as audio — a demod-audio

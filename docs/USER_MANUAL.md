@@ -1319,11 +1319,12 @@ the receiver measures the signal in its own passband, calibrated to dBm by
 > label on it. On a receiver with plenty of gain ahead of an 8-bit converter, an
 > RTL-SDR among them, its own noise sits high enough on that scale to read S9
 > with nothing plugged into the antenna socket. Nothing is wrong with the
-> receiver; the scale has not been told where zero is. Set `cal_offset_db` to
-> the difference between what the meter shows and a level you know — a signal
-> generator, or a band-noise reading you trust — and it will read in dBm from
-> then on. It is one number for the station, so where two radios differ, set it
-> for the one you judge signals on. Changing the front end's gain moves the
+> receiver; the scale has not been told where zero is. Set **S-meter
+> calibration** in Settings → Radio to the difference between what the meter
+> shows and a level you know — a signal generator, or a band-noise reading you
+> trust — and it will read in dBm from then on. It belongs to the radio, applies
+> as you drag it, and is added to `cal_offset_db` in `config.toml`, the older
+> station-wide figure. Changing the front end's gain moves the
 > reading with it, exactly as an attenuator ahead of a real receiver would.
 >
 > **Except on an SDRplay RSP**, which is the one front end here that reports

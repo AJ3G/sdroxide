@@ -1528,7 +1528,12 @@ use sdroxide_types::{
 /// ([`sdroxide_types::CwTextConfig`]) on its tail, beside the N1MM broadcast it
 /// sits with. `WsjtxConfig` rides `Command::SetWsjtxConfig` whole, so a v174
 /// peer handed one reads the extra bytes as the start of the next message.
-pub const PROTO_VERSION: u16 = 175;
+///
+/// v176: [`sdroxide_types::RadioConfig`] gains `s_meter_cal_db` (`f32`) on its
+/// tail — a per-radio S-meter calibration, settable from the UI (issue #642).
+/// `RadioConfig` rides `ServerMsg::RadioConfig` and `Command::SetRadioConfig`
+/// whole, so a v175 peer reads the extra bytes as the start of the next field.
+pub const PROTO_VERSION: u16 = 176;
 const VERSION_BYTE: u8 = 0x12;
 
 #[derive(Debug, thiserror::Error)]
@@ -2533,6 +2538,9 @@ mod tests {
                 sdroxide_types::BandDriveTrim { band: sdroxide_types::Band::M6, db: 2.0 },
             ],
             converter_offset_hz: 125_000_000.0,
+            // The new tail field, off its default so a peer one version behind
+            // cannot pass this by reading zeros.
+            s_meter_cal_db: -42.5,
             // The transmit converter is an enum with a payload on one variant
             // only — the shape a self-describing format forgives and postcard
             // does not, so it is carried here rather than left at its default.

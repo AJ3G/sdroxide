@@ -7433,6 +7433,15 @@ pub struct RadioConfig {
     /// refuses to make its rated power. See [`Self::tx_drive_ceiling`] for what
     /// it is for and why it is not the band table.
     pub tx_drive_max: Option<f32>,
+    /// This radio's S-meter calibration, in dB, added to the station's
+    /// `cal_offset_db`. An SDR's meter reads dBFS until it is told where zero
+    /// is, and the station-wide figure lived only in `config.toml` with no
+    /// control for it — and is wrong for every radio but the one it was set
+    /// against (#642). Settable from Settings → Radio and applied live.
+    ///
+    /// `0.0` in a configuration written before this existed: the meter reads
+    /// exactly as it did. Appended last, as every field here is.
+    pub s_meter_cal_db: f32,
 }
 
 impl RadioConfig {

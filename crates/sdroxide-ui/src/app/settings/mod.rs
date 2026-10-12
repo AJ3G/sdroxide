@@ -2234,6 +2234,42 @@ impl SdroxideApp {
                         }
                     });
                     ui.end_row();
+
+                    // Live, like the receive audio trim: it is set by watching
+                    // the S-meter while dragging (#642).
+                    ui.label(RichText::new("S-meter calibration").strong());
+                    ui.horizontal(|ui| {
+                        let was = cfg.s_meter_cal_db;
+                        ui.add(
+                            egui::DragValue::new(&mut cfg.s_meter_cal_db)
+                                .speed(0.5)
+                                .range(-150.0..=50.0)
+                                .fixed_decimals(1)
+                                .suffix(" dB"),
+                        )
+                        .on_hover_text(
+                            "Added to this radio's S-meter reading. An SDR's meter starts out \
+                             reading dBFS — level against the converter's full scale — so a \
+                             receiver with plenty of gain can show S9 with no antenna \
+                             connected. Set this to the difference between what the meter \
+                             shows and a level you know: a signal generator, or a quiet band \
+                             you trust to sit around S2–S3. Applies at once.\n\nOn top of \
+                             cal_offset_db in config.toml, which is one figure for the whole \
+                             station.",
+                        );
+                        if cfg.s_meter_cal_db != 0.0 && ui.button("0 dB").clicked() {
+                            cfg.s_meter_cal_db = 0.0;
+                        }
+                        // Saving the file alone reaches the engine only at the
+                        // next reopen; this is meant to be set while watching.
+                        if cfg.s_meter_cal_db != was {
+                            cmds.push(Command::SetRadioConfig {
+                                cfg: Box::new(cfg.clone()),
+                                reopen: false,
+                            });
+                        }
+                    });
+                    ui.end_row();
                 });
                 if let sdroxide_types::RxSite::Elsewhere(g) = &*site {
                     let g = g.trim();
