@@ -1158,6 +1158,10 @@ impl eframe::App for SdroxideApp {
             let morse = super::persist::shared_morse_progress()
                 .unwrap_or_else(|| self.morse.progress.clone());
             eframe::set_value(storage, "morse_progress", &morse);
+            // The browser's only copy of the HFDL chips; native keeps them in
+            // hfdl_channels.json, written on change.
+            #[cfg(target_arch = "wasm32")]
+            eframe::set_value(storage, "hfdl_channels", &self.hfdl_channels);
         }
     }
 }

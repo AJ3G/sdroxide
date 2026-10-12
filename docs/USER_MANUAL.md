@@ -5840,7 +5840,7 @@ Choose **HFDL** from the end of the **DIGITAL** row, or press the **HFDL** chip 
 | --- | --- |
 | **LISTEN** | Switches the decoder on and off. It costs a downconverter and a worker thread whether the panel is on screen or not, so it starts off, and it is off again next time you start sdroxide. |
 | The kHz field | The channel to listen on. Anything from 2 800 to 30 000 kHz. |
-| The frequency chips | The published assigned frequencies, one click each. **21.931 M** — Riverhead, covering the northern Atlantic and North America — is the default. |
+| The frequency chips | The published assigned frequencies, one click each. **21.931 M** — Riverhead, covering the northern Atlantic and North America — is the default. Your own channels follow them: **+** saves the channel in force as a chip, a click tunes to one, a right-click removes it. They are kept per machine in `hfdl_channels.json`. |
 
 Changing the channel moves the dial with it, so the panadapter shows the signal the decoder is working on. The channel frequency is the *assigned* frequency, which is where the suppressed carrier of the upper-sideband channel sits; the decoder finds its own subcarrier 1440 Hz above that, so put the assigned frequency on the dial and do not offset it by hand.
 
@@ -14794,6 +14794,7 @@ and not the station's.
 | `broadcast_stations.json` | JSON | *Your own* broadcast stations and corrections, merged over the downloaded schedule ([§10.6](#106-broadcast-stations-on-longwave-and-shortwave)). Never written by sdroxide, and absent until you create it. |
 | `broadcast/` | CSV | The broadcasting season's schedule as downloaded from eibispace.de, one file per season. Managed by sdroxide: refetched when the season changes, and safe to delete. |
 | `sstv_messages.json` | JSON | The overlay message stored for each of the five SSTV transmit slots. |
+| `hfdl_channels.json` | JSON | Your own HFDL frequency chips, in kHz ([§3.19](#319-hfdl-aircraft-on-shortwave)). |
 | `voice_names.json` | JSON | The label given to each of the ten voice-keyer slots. |
 | `voice/` | dir | The voice-keyer recordings (`slot1.wav`…`slot10.wav`), 48 kHz mono. Drop your own WAV in to replace a message. |
 | `speech_voices/` | dir | Extra voices for the spoken announcements: a Piper `.onnx` model and its `.onnx.json` config, side by side. Absent until you create it — the shipped voice lives with the program, not here. Note this is *not* `voice/`, which is the voice keyer. |

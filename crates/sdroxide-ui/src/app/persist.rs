@@ -263,7 +263,7 @@ pub(in crate::app) fn persist_hfdl_channels(khz: &[u32]) {
 
 #[cfg(target_arch = "wasm32")]
 pub(in crate::app) fn persist_hfdl_channels(_khz: &[u32]) {
-    // HFDL is a native wideband lane — the browser client never reaches this.
+    // Written with the rest of the browser's storage in `App::save`.
 }
 
 // ── Band conditions ──────────────────────────────────────────────────────────

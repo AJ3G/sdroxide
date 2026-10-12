@@ -121,10 +121,11 @@ impl SdroxideApp {
                     remove_khz = Some(khz);
                 }
             }
-            let already = self.hfdl_channels.contains(&cur_khz);
-            let add = crate::chrome::chip(ui, false, RichText::new("+").size(13.0));
+            let already =
+                self.hfdl_channels.contains(&cur_khz) || HFDL_PLAN_KHZ.contains(&cur_khz);
+            let add = crate::chrome::chip_enabled(ui, !already, false, "+");
             let add = if already {
-                add.on_hover_text(format!("{cur_khz} kHz is already one of your chips"))
+                add.on_disabled_hover_text(format!("{cur_khz} kHz already has a chip"))
             } else {
                 add.on_hover_text(format!(
                     "Save the current channel ({cur_khz} kHz) as one of your own chips"
@@ -140,7 +141,9 @@ impl SdroxideApp {
         }
         if add_now {
             let cur_khz = (cfg.frequency_hz / 1e3).round() as u32;
-            if add_hfdl_channel(&mut self.hfdl_channels, cur_khz) {
+            if !HFDL_PLAN_KHZ.contains(&cur_khz)
+                && add_hfdl_channel(&mut self.hfdl_channels, cur_khz)
+            {
                 crate::app::persist::persist_hfdl_channels(&self.hfdl_channels);
             }
         }
