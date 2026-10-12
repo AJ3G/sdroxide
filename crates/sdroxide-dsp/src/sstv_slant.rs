@@ -404,13 +404,14 @@ impl FreqTrack {
     }
 
     /// Start a new track at absolute sample `base`, holding at most `cap`
-    /// samples, for a mode whose sync pulse is `sync_len` samples. The
-    /// allocation of the last one is reused.
+    /// samples, for a mode whose sync pulse is `sync_len` samples.
     pub fn start(&mut self, base: u64, cap: usize, sync_len: f64) {
         self.base = base;
         self.q.clear();
         self.cap = cap;
-        self.q.reserve(cap.saturating_sub(self.q.capacity()));
+        // `reserve` counts from the length, which is 0 here: asking for the
+        // difference to the old capacity could leave pushes to double it.
+        self.q.reserve(cap);
         // Blocks of a sixteenth of a sync pulse: fine enough to place one, and
         // small enough in memory next to the track itself.
         self.block = ((sync_len / 16.0).floor() as usize).max(1);
@@ -440,8 +441,10 @@ impl FreqTrack {
         }
     }
 
+    /// Drops the allocation too: a long mode's track is tens of MB, and the
+    /// next picture's `start` allocates its own.
     pub fn clear(&mut self) {
-        self.q.clear();
+        self.q = Vec::new();
         self.cap = 0;
         self.recount();
     }
@@ -539,21 +542,29 @@ impl<'a> SyncMap<'a> {
     /// Mean sync-tone fill of a `len`-sample window on every line's sync
     /// position, if the lines start where `line` and the jumps say.
     pub fn score(&self, line: Line, len: f64) -> f64 {
-        self.fill(|k| line.at(k as f64) + self.offs[k], len)
+        self.fill(|k| line.at(k as f64) + self.offs[k], len, 1)
+    }
+
+    /// [`Self::score`] over every `stride`th line only — for the coarse grid,
+    /// whose window is four pulses wide and finds the column just as well from
+    /// a sample of the lines, at a fraction of the cost.
+    fn score_sparse(&self, line: Line, len: f64, stride: usize) -> f64 {
+        self.fill(|k| line.at(k as f64) + self.offs[k], len, stride)
     }
 
     /// The same, if the lines start where `t` says.
     pub fn score_timing(&self, t: &LineTiming, len: f64) -> f64 {
-        self.fill(|k| t.at(k as f64), len)
+        self.fill(|k| t.at(k as f64), len, 1)
     }
 
-    fn fill(&self, start: impl Fn(usize) -> f64, len: f64) -> f64 {
-        let mut s = 0.0;
-        for k in 0..self.g.lines {
+    fn fill(&self, start: impl Fn(usize) -> f64, len: f64, stride: usize) -> f64 {
+        let (mut s, mut n) = (0.0, 0usize);
+        for k in (0..self.g.lines).step_by(stride.max(1)) {
             let c = start(k) + self.g.sync_centre;
             s += self.cum_at(c + len / 2.0) - self.cum_at(c - len / 2.0);
+            n += 1;
         }
-        s / (self.g.lines.max(1) as f64 * len)
+        s / (n.max(1) as f64 * len)
     }
 
     /// The line along which the picture's sync tone lies.
@@ -588,12 +599,13 @@ impl<'a> SyncMap<'a> {
         };
         let c_n = (g.period / 2.0 / c_step).ceil() as i64;
         let b_n = (b_half / b_step).ceil() as i64;
+        let stride = (g.lines / 64).max(1);
         let mut best: Option<(f64, f64, f64)> = None; // (score, c, b)
         for bi in -b_n..=b_n {
             let b = b0 + bi as f64 * b_step;
             for ci in -c_n..=c_n {
                 let c = c0 + ci as f64 * c_step;
-                let s = self.score(at_mid(c, b), wide);
+                let s = self.score_sparse(at_mid(c, b), wide, stride);
                 if best.is_none_or(|(bs, _, _)| s > bs) {
                     best = Some((s, c, b));
                 }

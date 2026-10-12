@@ -4211,6 +4211,12 @@ one of the two.
 - In **Auto**, the mode is identified from the VIS header (or the sync cadence if
   you tuned in mid-picture) and pre-selected for your next transmission — no need
   to pick it.
+- **Tuning and slant are corrected for you.** A station a little off frequency
+  (up to about ±250 Hz) is measured on its leader or its sync pulses and tuned
+  in for that picture only. Line timing follows a straight line fitted through
+  the sync pulses, so a faded or noise-faked pulse does not shift the picture,
+  and when the picture ends a second pass straightens the whole of it. The
+  saved PNG is the straightened one. Drift *during* a picture is not followed.
 - **Restart RX** abandons the picture being received and starts listening for the
   next header. Once the decoder has locked on it is committed for the whole
   length of that mode, and the slow ones are long — Scottie DX runs four and a

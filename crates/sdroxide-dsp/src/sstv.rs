@@ -1290,9 +1290,12 @@ impl SstvRx {
     }
 
     fn step_hunt(&mut self, out: &mut Vec<SstvEvent>) {
+        // Slid first: a retune below recounts the windows through the newest
+        // sample, and sliding after it would add that sample twice and take
+        // off one the recount never counted — a count that wraps below zero.
+        self.slide_vis_windows();
         self.step_fsk_id(out);
         self.release_afc();
-        self.slide_vis_windows();
         let lead_n = (LEADER_WIN_S * self.rate) as u64 as f64;
         let edge_n = (EDGE_WIN_S * self.rate) as u64;
         let is_leader =
@@ -1610,8 +1613,21 @@ impl SstvRx {
         if let Some((hz, spread)) = self.tone_hz(&pulses) {
             let off = hz - SYNC_HZ;
             if spread <= AFC_MAX_SPREAD_HZ && (self.afc_hz + off).abs() <= AFC_MAX_HZ {
+                // The partial track is thrown away by `begin_image` below;
+                // shifting it first would only cost time.
+                self.track.clear();
                 self.retune(off);
+            } else if self.afc_hold.is_some() {
+                // Unmeasured, and the last station's offset still held: this
+                // is another station, so back to the receiver's own tuning.
+                self.afc_hold = None;
+                self.track.clear();
+                self.retune(-self.afc_hz);
             }
+        } else if self.afc_hold.is_some() {
+            self.afc_hold = None;
+            self.track.clear();
+            self.retune(-self.afc_hz);
         }
         self.sync_hist.clear();
         self.begin_image(mode, line_start, false, out);
@@ -2747,6 +2763,23 @@ mod tests {
             "a call into the receiver took {:?}",
             got.worst_call
         );
+    }
+
+    /// The same on a weak picture, where the live fit never forms and the
+    /// second pass has to search every period: the costliest case, on the
+    /// longest modes.
+    #[test]
+    fn a_weak_pictures_second_pass_does_not_stall() {
+        for mode in [SstvMode::WraaseSc2_180, SstvMode::ScottieDx, SstvMode::Martin1] {
+            let got = edges_through(mode, 3000.0, 0.25, &|_| 1.0, None);
+            let limit = if cfg!(debug_assertions) { 500 } else { 40 };
+            assert!(
+                got.worst_call < std::time::Duration::from_millis(limit),
+                "{}: a call into the receiver took {:?}",
+                mode.label(),
+                got.worst_call
+            );
+        }
     }
 
     /// A long fade before enough sync pulses have come in to fit a line
