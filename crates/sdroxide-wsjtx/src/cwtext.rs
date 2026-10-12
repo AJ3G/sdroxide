@@ -38,7 +38,7 @@ impl CwTextUdp {
         if dest.is_ipv4() {
             let _ = sock.set_broadcast(true);
         }
-        if dest.ip().is_multicast() {
+        if dest.is_ipv4() && dest.ip().is_multicast() {
             let _ = sock.set_multicast_ttl_v4(2);
         }
         let addr = format!("{host}:{}", cfg.port);

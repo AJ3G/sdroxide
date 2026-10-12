@@ -982,6 +982,11 @@ impl DigiEngine for CwController {
     /// gesture — the CLEAR RX chip says "the decode windows are clean", so the
     /// read-back goes with them rather than lingering from the last over.
     fn clear_rx(&mut self) {
+        // The window starts over but a UDP listener's copy does not: end what
+        // it has with a space, or the next commit runs into the last word.
+        if self.rx_text.ends_with(|c: char| c != ' ') {
+            self.rx_new.push(' ');
+        }
         self.rx_text.clear();
         self.rx_pending.clear();
         self.sent_text.clear();

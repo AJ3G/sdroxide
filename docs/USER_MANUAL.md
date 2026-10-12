@@ -12454,8 +12454,8 @@ text, a datagram at a time as it settles — for a station controller, a
 logger's CW window or a script. There is no protocol: a listener appends what
 arrives, and `nc -ul 9999` shows it as it comes. Only settled text goes out,
 never the last word or two the neural decoder is still revising, so nothing
-sent is ever taken back. SDRangel's Morse decoder sends its copy in the same
-form to the same default port, so a listener written for one serves the other.
+sent is ever taken back. Each radio has its own switch and sends only its own
+copy; two radios sending to one port arrive interleaved.
 
 - **Send to** — `127.0.0.1` for this machine; a LAN address, or this subnet's
   broadcast address, for others.

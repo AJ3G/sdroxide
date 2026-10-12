@@ -144,8 +144,7 @@ pub(in crate::app) fn settings_wsjtx_tab(
             "The CW panel's copy as plain text, one UDP datagram per piece as it settles — for a \
              station controller, a logger's CW window or a script. No protocol: a listener just \
              appends what arrives (try nc -ul 9999). Only settled text is sent, never the tail \
-             the decoder is still revising. SDRangel's Morse decoder uses the same form and \
-             port, so listeners written for it work here too.",
+             the decoder is still revising. Each radio has its own switch.",
         )
         .weak(),
     );
@@ -169,7 +168,7 @@ pub(in crate::app) fn settings_wsjtx_tab(
 
             ui.label("Port");
             ui.add(egui::DragValue::new(&mut cfg.cw_text.port).range(1..=65535))
-                .on_hover_text("9999, the port SDRangel's Morse decoder sends to");
+                .on_hover_text("9999 by default");
             ui.end_row();
         });
     });

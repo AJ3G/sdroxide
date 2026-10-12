@@ -132,7 +132,10 @@ impl Default for CwTextConfig {
 }
 
 impl CwTextConfig {
+    /// The destination as the sender spells it — trimmed, and 127.0.0.1 for a
+    /// blank host — so the engine rebuilds the socket only on a real change.
     pub fn addr(&self) -> String {
-        format!("{}:{}", self.host, self.port)
+        let host = self.host.trim();
+        format!("{}:{}", if host.is_empty() { "127.0.0.1" } else { host }, self.port)
     }
 }
