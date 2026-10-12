@@ -4561,13 +4561,20 @@ fn engine_thread(
             // spends that budget: the transmit ring empties, and hardware that
             // answers an underrun by skipping ahead (SoapySX does) puts the
             // over on the air as chirps. See `IqSource::read_available`.
-            if engine.caps.full_duplex && !engine.audio_mode {
+            if engine.rx_drawn_during_tx() {
                 if let Ok(n @ 1..) = engine.source.read_available(&mut buf) {
+                    lane_samples += n as u64;
                     engine.samples_read += n as u64;
                     engine.last_block = n as u64;
                     engine.adc.observe(&buf[..n]);
+                    if engine.state.noise_blanker {
+                        engine.nb.process(&mut buf[..n]);
+                    }
                     let iq = decimate(engine.decim.as_mut(), &buf[..n], &mut dbuf);
-                    engine.run_audio(iq);
+                    // The panadapter and waterfall too, not just the audio: a
+                    // QO-100 station watches its own downlink through the over
+                    // (#652).
+                    engine.process_block(iq, pool.as_ref());
                 }
             }
         } else {
@@ -7530,7 +7537,7 @@ impl Engine {
         let scope_draws = self.audio_mode
             && self.scope_main_window().is_some()
             && self.audio_zoom_window().is_none();
-        !(self.tx_active || scope_draws)
+        !((self.tx_active && !self.rx_drawn_during_tx()) || scope_draws)
     }
 
     /// Build a full-band frame, if a sweep has arrived since the last one.
@@ -7782,7 +7789,7 @@ impl Engine {
     }
 
     fn make_spectrum_frame(&mut self) -> SpectrumFrame {
-        if self.tx_active {
+        if self.tx_active && !self.rx_drawn_during_tx() {
             return self.make_tx_frame();
         }
         let bins = self.cfg.bins();
@@ -16277,6 +16284,16 @@ impl Engine {
     /// spends the over deaf. Where this is false the sidetone is played live
     /// from the TX loop instead of queued — see [`Self::play_cw_sidetone`].
     fn cw_monitor_drained_during_tx(&self) -> bool {
+        self.rx_drawn_during_tx()
+    }
+
+    /// Whether the receiver is still the picture through an over: a
+    /// full-duplex I/Q source keeps being read (see
+    /// [`Self::cw_monitor_drained_during_tx`]), so the panadapter shows what it
+    /// hears — a satellite station's own downlink, a paired receiver with
+    /// blanking off — rather than the TX monitor (#652). The TX monitor is for
+    /// radios that go deaf when keyed.
+    fn rx_drawn_during_tx(&self) -> bool {
         self.caps.full_duplex && !self.audio_mode
     }
 
@@ -16778,6 +16795,7 @@ impl Engine {
         let drive = self.tx_drive();
         let tune_level = self.tx_tune_level();
         let cessb_db = self.state.tx.cessb_db;
+        let rx_drawn = self.rx_drawn_during_tx();
         let Some(tx) = self.tx.as_mut() else { return Ok(()) };
 
         tx.mod_buf.clear();
@@ -16883,8 +16901,11 @@ impl Engine {
         }
         if !tx.tx_buf.is_empty() {
             self.source.tx_write(&tx.tx_buf)?;
-            // The upconverted IQ feeds the wideband display at its RF position.
-            self.analyzer.process(&tx.tx_buf);
+            // The upconverted IQ feeds the wideband display at its RF position
+            // — unless the receiver is drawing it.
+            if !rx_drawn {
+                self.analyzer.process(&tx.tx_buf);
+            }
         }
         // Keep the device/network TX ring near-empty (HPSDR ≈ 0.5 s, SoapySDR
         // varies) rather than letting a fast loop fill it and delay the signal.
@@ -16924,6 +16945,7 @@ impl Engine {
         }
         // Read before the chain is borrowed, as above.
         let drive = self.tx_drive();
+        let rx_drawn = self.rx_drawn_during_tx();
         let Some(tx) = self.tx.as_mut() else { return Ok(()) };
 
         tx.mod_buf.clear();
@@ -16962,7 +16984,9 @@ impl Engine {
         }
         if !tx.tx_buf.is_empty() {
             self.source.tx_write(&tx.tx_buf)?;
-            self.analyzer.process(&tx.tx_buf); // wideband RF display
+            if !rx_drawn {
+                self.analyzer.process(&tx.tx_buf); // wideband RF display
+            }
         }
         // Pace the burst to real time so it isn't raced into the device ring
         // (which would drop PTT early — the tail matters for FT8 decode).

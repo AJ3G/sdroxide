@@ -9221,7 +9221,8 @@ stream in both directions and trying produces a transmission full of holes.
 
 Turn it on for a board on **real Ethernet** — a LibreSDR, or a Pluto behind a
 gigabit adapter — and you keep hearing the receiver through your own
-transmission. That is what a QO-100 station wants: the downlink comes back
+transmission, and the panadapter and waterfall keep drawing it instead of
+switching to the transmit monitor. That is what a QO-100 station wants: the downlink comes back
 through the transponder about a quarter of a second later, and listening to it
 while you talk is how you check your own audio, your drive and your frequency.
 It works for anything else split across two bands too — a crossband repeater
