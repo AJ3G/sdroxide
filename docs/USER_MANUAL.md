@@ -10622,6 +10622,8 @@ let the radio go elsewhere.
 
 - **The attached receiver** — sdroxide demodulates its I/Q, so the filter, AGC,
   noise reduction, notch and squelch in the panel are the ones doing the work.
+  The S-meter reads the receiver's I/Q too, against this radio's own S-meter
+  calibration.
 - **The transceiver** — its own demodulated audio, over its sound card. Then the
   rig is the receiver in every sense that can be heard: the digital-mode
   decoders, the CW skimmer's keyboard decoder and the recorder all work on that

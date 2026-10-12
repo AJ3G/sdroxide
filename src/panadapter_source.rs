@@ -644,8 +644,21 @@ impl IqSource for PanadapterSource {
         self.ctrl.set_rit_hz(hz);
     }
 
+    /// The meter follows what is being listened to: the rig's own meter only
+    /// while its audio is the one heard. Otherwise `None`, so the engine
+    /// measures the receiver's I/Q like any other — reading the rig's meter
+    /// there showed S0 on a dummy load over a band full of signals (#619).
     fn rx_signal_dbm(&mut self) -> Option<f32> {
-        self.ctrl.rx_signal_dbm()
+        if self.cfg.audio == PanadapterAudio::Transceiver {
+            self.ctrl.rx_signal_dbm()
+        } else {
+            None
+        }
+    }
+
+    /// The receiver's, since its I/Q is what the engine measures.
+    fn rx_gain_db(&self) -> Option<f32> {
+        self.rx.rx_gain_db()
     }
 
     /// The *receiver's*, not the transceiver's: what overflows is the converter
@@ -866,13 +879,22 @@ mod tests {
         /// Samples handed over by `read`, real part only.
         audio: Vec<f32>,
         signal_dbm: Option<f32>,
+        gain_db: Option<f32>,
     }
 
     impl Fake {
         fn new(name: &'static str, rate: f64, center: f64) -> (Self, Arc<Mutex<Log>>) {
             let log = Arc::new(Mutex::new(Log::default()));
             (
-                Fake { name, rate, center, log: log.clone(), audio: Vec::new(), signal_dbm: None },
+                Fake {
+                    name,
+                    rate,
+                    center,
+                    log: log.clone(),
+                    audio: Vec::new(),
+                    signal_dbm: None,
+                    gain_db: None,
+                },
                 log,
             )
         }
@@ -916,6 +938,9 @@ mod tests {
         }
         fn rx_signal_dbm(&mut self) -> Option<f32> {
             self.signal_dbm
+        }
+        fn rx_gain_db(&self) -> Option<f32> {
+            self.gain_db
         }
     }
 
@@ -1123,15 +1148,25 @@ mod tests {
         assert!(rx_log.lock().unwrap().tx_begins.is_empty(), "the receiver never transmits");
     }
 
-    /// The S-meter is the transceiver's: it is the radio on the antenna the
-    /// operator is working.
+    /// The S-meter follows what is heard: the transceiver's own meter while
+    /// its audio is the one listened to, the receiver's I/Q otherwise (#619).
     #[test]
-    fn the_s_meter_is_the_transceivers() {
+    fn the_s_meter_follows_the_audio() {
         let (rx, _) = Fake::new("rx", 2e6, 14e6);
         let (mut ctrl, _) = Fake::new("rig", 48_000.0, 14e6);
         ctrl.signal_dbm = Some(-73.0);
-        let mut src = PanadapterSource::new(Box::new(rx), Box::new(ctrl), cfg(), Some(Mode::Usb));
+        let c = PanadapterConfig { audio: PanadapterAudio::Transceiver, ..cfg() };
+        let mut src = PanadapterSource::new(Box::new(rx), Box::new(ctrl), c, Some(Mode::Usb));
         assert_eq!(src.rx_signal_dbm(), Some(-73.0));
+
+        let (mut rx, _) = Fake::new("rx", 2e6, 14e6);
+        rx.gain_db = Some(42.0);
+        let (mut ctrl, _) = Fake::new("rig", 48_000.0, 14e6);
+        ctrl.signal_dbm = Some(-73.0);
+        let c = PanadapterConfig { audio: PanadapterAudio::Attached, ..cfg() };
+        let mut src = PanadapterSource::new(Box::new(rx), Box::new(ctrl), c, Some(Mode::Usb));
+        assert_eq!(src.rx_signal_dbm(), None, "the engine measures the receiver's I/Q");
+        assert_eq!(src.rx_gain_db(), Some(42.0), "against the receiver's gain");
     }
 
     /// An inverted tap is mirrored about its centre on the way in.
