@@ -6970,10 +6970,14 @@ board) the setting is simply inert, which is why it costs nothing to leave on.
 separate from any sound card wired to a radio:
 
 - **Output** — where receive audio is played.
+- **Channels** — **Left + right** (the default), **Left only** or **Right only**.
+  One side gets everything you hear (both receivers, WFM stereo, sidetone)
+  mixed to mono, for one earpiece or a single speaker. Alerts, speech and a
+  radio's own TX sound card are unaffected.
 - **Input** — your microphone for voice transmit.
 
-Both default to **System default** and can be changed live. In `config.toml`
-they are `audio_output` and `audio_input`.
+All three can be changed live. Output and input default to **System default**.
+In `config.toml` they are `audio_output`, `audio_routing` and `audio_input`.
 
 The microphone is opened in the background — at startup and whenever you change
 the selection. A capture device the system's sound server cannot deliver can take

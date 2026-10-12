@@ -390,7 +390,9 @@ fn spawn_output(
                     let mut short = false;
                     for frame in data.chunks_mut(channels) {
                         let (l, r) = match (consumer.pop(), consumer.pop()) {
-                            (Ok(l), Ok(r)) => routing.apply(l, r),
+                            // A mono card downmixes below anyway.
+                            (Ok(l), Ok(r)) if channels >= 2 => routing.apply(l, r),
+                            (Ok(l), Ok(r)) => (l, r),
                             _ => {
                                 short = true;
                                 (0.0f32, 0.0f32)

@@ -174,8 +174,8 @@ pub(in crate::app) struct SettingsIo<'a> {
     /// `SdroxideApp::rx_site_edit`.
     rx_site: &'a mut Option<sdroxide_types::RxSite>,
     audio_pick: &'a mut Option<(bool, Option<String>)>,
-    /// Which speaker channel(s) the received audio reaches, buffered until the
-    /// window closes (#654).
+    /// Which speaker channel(s) the received audio reaches, applied after the
+    /// window closure (#654).
     routing_pick: &'a mut Option<sdroxide_types::AudioRouting>,
     hpsdr_discover: &'a mut bool,
     /// The name being typed in the Profiles tab's save box. Owned on the app:
