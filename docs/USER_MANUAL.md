@@ -6814,7 +6814,7 @@ section of the General tab is only shown there.
 
 At the top is **SDRoxide** and the version number this copy was built from —
 the one to quote in a bug report, so there is no need to go looking for the
-binary to ask it.
+binary to ask it. The main window's title bar carries it too.
 
 **Station** — your **Callsign** and **Grid square**. This is the identity the
 whole program uses: FT8/FT4/FT2 exchanges, the SSTV image header, the logbook, the
