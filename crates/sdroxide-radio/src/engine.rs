@@ -243,6 +243,23 @@ fn build_analyzer(
     )
 }
 
+/// How much of the transmitted audio the TX monitor draws outside audio mode
+/// (see [`Engine::make_tx_frame`]); in audio mode it is the rig's own passband.
+const TX_MONITOR_VIEW_HZ: f64 = 3500.0;
+
+/// The TX monitor's analyser: a window sized for the few kilohertz it shows,
+/// not the panadapter's FFT size. At 48 kHz a 131072-point window took 2.7 s
+/// to fill, so after key-down the display froze on the last receive picture
+/// for seconds before the monitor appeared (#618).
+fn tx_monitor_analyzer(
+    fft_size: usize,
+    avg_tc: f32,
+    rows_per_sec: f64,
+    view_hz: f64,
+) -> SpectrumAnalyzer {
+    build_analyzer(fft_size, TX_MONITOR_RATE, avg_tc, rows_per_sec, Some(view_hz))
+}
+
 /// Workers in the pool the block loop forks its lanes onto.
 ///
 /// One block of receive samples divides into three independent pieces — the
@@ -4048,7 +4065,12 @@ fn engine_thread(
         wide_seq: 0,
         scope_seq: 0,
         wide_levels: None,
-        tx_analyzer: SpectrumAnalyzer::new(cfg.fft_size as usize, TX_MONITOR_RATE, cfg.avg_tc),
+        tx_analyzer: tx_monitor_analyzer(
+            cfg.fft_size as usize,
+            cfg.avg_tc,
+            f64::from(cfg.rows()),
+            if audio_mode { audio_bw } else { TX_MONITOR_VIEW_HZ },
+        ),
         tx_mon_buf: Vec::new(),
         tune_phase: 0.0,
         sub_tone: None,
@@ -7788,6 +7810,11 @@ impl Engine {
         self.stream_center_hz
     }
 
+    /// See [`TX_MONITOR_VIEW_HZ`].
+    fn tx_monitor_view_hz(&self) -> f64 {
+        if self.audio_mode { self.audio_bw } else { TX_MONITOR_VIEW_HZ }
+    }
+
     fn make_spectrum_frame(&mut self) -> SpectrumFrame {
         if self.tx_active && !self.rx_drawn_during_tx() {
             return self.make_tx_frame();
@@ -7935,7 +7962,7 @@ impl Engine {
         // wideband IQ analyzer — even though it isn't `audio_mode` or digital.
         let mut frame = if self.audio_mode || self.caps.tx_audio || self.channel_analyzer.is_some()
         {
-            let bw = if self.audio_mode { self.audio_bw } else { 3500.0 };
+            let bw = self.tx_monitor_view_hz();
             let vp = if self.state.rx[0].mode.is_carrier_centered() {
                 // RIFP's transmitted signal straddles the dial.
                 let half = (self.state.rx[0].filter_hi - self.state.rx[0].filter_lo).abs() as f64
@@ -8862,10 +8889,11 @@ impl Engine {
                     // once per zoom step rather than once a session.
                     next.seed_from(&self.analyzer, (0.0, 1.0));
                     self.analyzer = next;
-                    self.tx_analyzer = SpectrumAnalyzer::new(
+                    self.tx_analyzer = tx_monitor_analyzer(
                         self.cfg.fft_size as usize,
-                        TX_MONITOR_RATE,
                         self.cfg.avg_tc,
+                        f64::from(self.cfg.rows()),
+                        self.tx_monitor_view_hz(),
                     );
                 } else {
                     self.analyzer.set_avg_tc(self.cfg.avg_tc, rate);
