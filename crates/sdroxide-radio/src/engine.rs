@@ -10786,6 +10786,29 @@ impl Engine {
         }
     }
 
+    /// Put the LO on the dial when an AIS window parked off it misses a
+    /// channel. A front end that offsets its LO left it there on entering
+    /// AIS, since one channel already sat inside the span (#658); centred on
+    /// the dial, which AIS puts between the channels, the window holds both.
+    fn reseat_ais_on_dial(&mut self) {
+        if !self.state.rx[0].mode.is_ais() {
+            return;
+        }
+        let dial = self.state.active_freq_hz();
+        if (self.state.center_hz - dial).abs() < 1.0 {
+            return;
+        }
+        let rate = Ddc::rate_for(self.state.sample_rate, self.ais_target_rate_hz());
+        let total = sdroxide_ais::plan::CHANNELS.len();
+        let reached = |c: f64| sdroxide_ais::plan::channels_in_window(c, rate).len();
+        let here = reached(self.ais_window_center_hz(rate));
+        let on_dial =
+            reached(sdroxide_ais::plan::window_center_for(dial, self.state.sample_rate, rate));
+        if here < total && on_dial > here {
+            self.retune(dial);
+        }
+    }
+
     /// Re-place the window after a retune or a rate change.
     ///
     /// The aircraft table survives: a receiver nudged a hundred kilohertz is
@@ -13182,6 +13205,7 @@ impl Engine {
             // hands the discriminator a 250 kHz channel with the DC spike
             // inside it. Re-check the clearance and move the LO if it grew.
             if !self.audio_mode {
+                self.reseat_ais_on_dial();
                 // `follow_dial` rather than the span check alone: entering or
                 // leaving CW moves a self-keying transceiver's VFO by a whole
                 // sidetone (`rig_cw_offset_hz`), and that is a move no span
@@ -17230,6 +17254,12 @@ impl Engine {
     /// decimated receiver sits exactly as far off DC, relatively, as an
     /// undecimated one.
     fn lo_offset_hz(&self) -> f64 {
+        // AIS parks the dial between its two channels, 25 kHz from each, so
+        // DC on the LO lands in the gap. Offsetting the LO by a quarter of a
+        // decimated span pushed AIS A out of the window (#658).
+        if self.state.rx[0].mode.is_ais() {
+            return 0.0;
+        }
         self.source.lo_offset_hz() / self.state.decimation as f64
     }
 
