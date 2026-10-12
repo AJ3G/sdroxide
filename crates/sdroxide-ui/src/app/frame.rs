@@ -27,8 +27,12 @@ const STREAM_STALE_S: f64 = 1.0;
 /// The wall clock, top-right of the panadapter: UTC and the operator's own
 /// local time, so a listener always has both in view. Draw-only over the
 /// picture — it never reflows the strip — and the local half is dropped when
-/// the operator is already on UTC.
-fn paint_panadapter_clock(ui: &egui::Ui, area: egui::Rect) {
+/// the operator is already on UTC. Stood aside while the pointer is near it,
+/// so the hover and filter-edge readouts it would cover can be read.
+fn paint_panadapter_clock(ui: &egui::Ui, area: egui::Rect, on: bool) {
+    if !on {
+        return;
+    }
     let text = crate::time::utc_and_local_now(now_unix());
     let p = ui.painter_at(area);
     let ink = egui::Color32::LIGHT_GRAY;
@@ -36,6 +40,9 @@ fn paint_panadapter_clock(ui: &egui::Ui, area: egui::Rect) {
     let size = galley.size() + egui::vec2(12.0, 7.0);
     let rect =
         egui::Rect::from_min_size(egui::pos2(area.right() - size.x - 8.0, area.top() + 8.0), size);
+    if ui.ctx().pointer_hover_pos().is_some_and(|p| rect.expand(48.0).contains(p)) {
+        return;
+    }
     p.rect_filled(rect, 4.0, egui::Color32::from_black_alpha(150));
     p.galley(rect.center() - galley.size() / 2.0, galley, ink);
 }
@@ -708,7 +715,7 @@ impl eframe::App for SdroxideApp {
                         show_panel,
                         &mut cmds,
                     );
-                    paint_panadapter_clock(ui, ui.max_rect());
+                    paint_panadapter_clock(ui, ui.max_rect(), self.ui_settings.panadapter_clock);
                 });
             }
             // Only between two things: with the panadapter switched off there
@@ -912,6 +919,7 @@ impl eframe::App for SdroxideApp {
                         show_panel,
                         &mut cmds,
                     );
+                    paint_panadapter_clock(ui, ui.max_rect(), self.ui_settings.panadapter_clock);
                 });
             }
             if show_panel {

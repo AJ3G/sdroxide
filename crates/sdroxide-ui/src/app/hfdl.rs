@@ -121,8 +121,7 @@ impl SdroxideApp {
                     remove_khz = Some(khz);
                 }
             }
-            let already =
-                self.hfdl_channels.contains(&cur_khz) || HFDL_PLAN_KHZ.contains(&cur_khz);
+            let already = self.hfdl_channels.contains(&cur_khz) || HFDL_PLAN_KHZ.contains(&cur_khz);
             let add = crate::chrome::chip_enabled(ui, !already, false, "+");
             let add = if already {
                 add.on_disabled_hover_text(format!("{cur_khz} kHz already has a chip"))

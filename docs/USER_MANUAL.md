@@ -11621,6 +11621,9 @@ spoken announcements below them under `[speech]`:
   can look lower-resolution than the transform behind it really is. A bigger FFT
   (the **FFT** chip, [2.8](#28-the-display-and-fft-controls)) is the other half
   of that, and the two are worth setting together.
+- **Clock** — on by default. A wall clock at the panadapter's top-right shows
+  UTC and your local time (`13:08:42 UTC · 14:08 local`; just UTC when you are
+  on UTC). It steps aside while the pointer is near it.
 - **Spectrum background** — a vertical gradient behind the spectrum line, filled
   from the **top** colour down to the **bottom** colour (default dark red →
   black). Untick **Gradient** for a plain background.
