@@ -1000,8 +1000,9 @@ them all at once.
   a station coming up for a moment doesn't move the contrast — and no more than
   one refit is started every five seconds. Switching FIT **on** fits at once,
   which is also how to ask for a one-off fit: click it off and on again.
-  Switching it off leaves the levels wherever you set them (the floor and
-  ceiling in the FFT popup are yours to keep only while FIT is off).
+  Switching it off leaves the levels wherever you set them. Moving the floor or
+  ceiling by hand (the FFT popup, or a mapped knob) switches FIT off for you, so
+  the level you set stays where you put it.
 - **CTR** — keep the tuned frequency in the **middle** of the panadapter. Lit,
   the window slides under the dial every time you tune **and every time you
   zoom**, so the marker stays put and the band scrolls past it. It is **off**

@@ -5479,31 +5479,40 @@ impl SdroxideApp {
         // level it was left at and had to be re-fitted by hand every time
         // (issue #375). A slider is one grab from either stop, and the FIT chip
         // above sets both at once from what is on screen.
+        // Through a copy, because a level set by hand switches FIT off — left
+        // on, it pulled the level straight back (#642).
+        let (mut floor, mut ceil) = (self.view.db_floor, self.view.db_ceil);
         ui.horizontal(|ui| {
             ui.label("floor");
-            crate::chrome::slider_readout(
+            let r = crate::chrome::slider_readout(
                 ui,
                 value_field_w(ui, "-888 dB"),
-                Slider::new(&mut self.view.db_floor, -160.0..=-40.0)
+                Slider::new(&mut floor, -160.0..=-40.0)
                     .show_value(true)
                     .custom_formatter(|v, _| format!("{v:.0} dB")),
             )
             .on_hover_text(
-                "The level drawn at the bottom of the spectrum and as the darkest waterfall                  colour. Bring it up until the noise floor just darkens.",
+                "The level drawn at the bottom of the spectrum and as the darkest waterfall                  colour. Bring it up until the noise floor just darkens. Setting it switches FIT off.",
             );
+            if r.changed() {
+                self.view.set_levels_by_hand(floor, self.view.db_ceil);
+            }
         });
         ui.horizontal(|ui| {
             ui.label("ceil ");
-            crate::chrome::slider_readout(
+            let r = crate::chrome::slider_readout(
                 ui,
                 value_field_w(ui, "-888 dB"),
-                Slider::new(&mut self.view.db_ceil, -100.0..=20.0)
+                Slider::new(&mut ceil, -100.0..=20.0)
                     .show_value(true)
                     .custom_formatter(|v, _| format!("{v:.0} dB")),
             )
             .on_hover_text(
-                "The level drawn at the top. Bring it down until the strongest signal you                  care about reaches full colour.",
+                "The level drawn at the top. Bring it down until the strongest signal you                  care about reaches full colour. Setting it switches FIT off.",
             );
+            if r.changed() {
+                self.view.set_levels_by_hand(self.view.db_floor, ceil);
+            }
         });
         // Chips rather than a ComboBox: the combo opens a second popup
         // layer, and clicking it counts as "outside" and closes this one.
