@@ -3565,9 +3565,9 @@ impl SdroxideApp {
                     .suffix(" Hz"),
             )
             .on_hover_text(
-                "How far above this radio's dial the receiver sits, in hertz. 0 for a receiver \
-                 on the same antenna; the intermediate frequency for an I.F. tap — 9000000 for \
-                 a 9 MHz I.F., 70455000 for a 70.455 MHz one.\n\nThis is not the Converter field \
+                "How far above this radio's dial the receiver sits, in hertz — 0 for a \
+                 receiver on the same antenna. For an I.F. tap, the intermediate frequency the \
+                 receiver is parked on: 8215000 for a K3's KXV3B, 9000000 for a 9 MHz I.F.\n\nThis is not the Converter field \
                  above, which retunes the radio, and not the CAT tab's I/Q centre offset, which \
                  is about this radio's own sound card. Nothing typed here is ever sent to \
                  either radio.\n\nTakes effect on Apply.",

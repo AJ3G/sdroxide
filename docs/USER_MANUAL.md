@@ -10583,14 +10583,19 @@ what the offset below it means:
 
 - **Antenna (shared with the radio)** — a splitter, or the transceiver's RX-out
   loop. The receiver simply tunes to the dial and the offset stays `0`.
-- **The radio's I.F. output** — the receiver watches the transceiver's
-  intermediate frequency and never really tunes at all: the rig's own first
-  oscillator moves the band underneath it. The **Offset** is that intermediate
-  frequency — `9000000` for a 9 MHz I.F., `70455000` for a 70.455 MHz one.
+- **The radio's I.F. output** — the receiver is parked on the transceiver's
+  intermediate frequency and never tunes at all: the rig's own first oscillator
+  moves the band underneath it. The **Offset** is that intermediate frequency —
+  `8215000` for a K3's KXV3B, `9000000` for a 9 MHz I.F. The panadapter then
+  behaves like a rig's own I/Q output: its centre is the rig's dial, clicking or
+  dragging on it tunes the rig, and turning the rig's knob moves the picture.
+  **Follow the dial** has nothing to do here, since the receiver never moves. A
+  rig whose oscillator sits above the signal (the K3 does) hands the band over
+  backwards — tick **Invert spectrum**.
 
-The offset is **in hertz** and its sign follows the same rule as the converter's
-above: the receiver is tuned to `dial + offset`. Nothing you type here is ever
-sent to either radio.
+The offset is **in hertz**. On an antenna tap the receiver is tuned to
+`dial + offset`; on an I.F. tap it sits on the offset. Nothing you type here is
+ever sent to either radio.
 
 **This is a third offset field, and the three do different things.** The
 **Converter** offset above retunes the radio itself, for hardware in the antenna
