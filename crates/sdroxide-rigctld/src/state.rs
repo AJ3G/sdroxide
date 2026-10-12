@@ -244,7 +244,7 @@ pub fn agc_from_hamlib(v: i32) -> Option<AgcMode> {
 pub fn to_hamlib_mode(m: Mode) -> &'static str {
     match m {
         Mode::Lsb => "LSB",
-        Mode::Usb => "USB",
+        Mode::Usb | Mode::Hfdl => "USB",
         Mode::Cw => "CW",
         // Hamlib has no DRM mode, and the nearest true statement is AM:
         // the carrier is on the dial and the channel is about as wide.
@@ -258,7 +258,7 @@ pub fn to_hamlib_mode(m: Mode) -> &'static str {
         Mode::Rifp | Mode::Packet | Mode::Aprs | Mode::SstvFm | Mode::RttyFm => "PKTFM",
         // No rig has an ADS-B mode; a remote hamlib client asking is told the
         // widest FM there is, which is at least the right kind of receiver.
-        Mode::Wfm | Mode::Adsb | Mode::Vdl2 | Mode::Ais | Mode::Hfdl | Mode::HdRadio => "WFM",
+        Mode::Wfm | Mode::Adsb | Mode::Vdl2 | Mode::Ais | Mode::HdRadio => "WFM",
         Mode::Digu => "PKTUSB",
         Mode::Digl => "PKTLSB",
         Mode::Dsb => "DSB",

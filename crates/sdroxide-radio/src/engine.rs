@@ -17522,6 +17522,7 @@ fn rig_mode_class(m: Mode) -> u8 {
         | Mode::PacketHf
         | Mode::AtChat
         | Mode::Fsk441
+        | Mode::Hfdl
         | Mode::Spec => 1,
         // DRM sits on the dial in a channel about as wide as AM's, and a
         // rig has no DRM setting to report back — see `to_hamlib_mode`.
@@ -17542,7 +17543,6 @@ fn rig_mode_class(m: Mode) -> u8 {
         | Mode::Adsb
         | Mode::Vdl2
         | Mode::Ais
-        | Mode::Hfdl
         | Mode::HdRadio => 5,
     }
 }
@@ -17743,6 +17743,13 @@ mod rig_mode_class_tests {
     /// Issue #119: CW keyed as audio (MCW) is commanded to the rig as the digi
     /// sideband, so the rig echoing USB (or DATA-U) back is it doing exactly
     /// as told — not the operator leaving CW — and must be same-class.
+    /// Issue #662: HFDL is commanded to the rig as USB, so a rig reporting
+    /// USB is still in HFDL rather than the operator having left it.
+    #[test]
+    fn a_rig_on_usb_is_where_hfdl_left_it() {
+        assert_eq!(rig_mode_class(Mode::Hfdl), rig_mode_class(Mode::Usb));
+    }
+
     #[test]
     fn a_rig_on_the_sideband_is_where_cw_as_mcw_left_it() {
         let expected = expected_rig_class(Mode::Cw, true, 7_030_000.0);
