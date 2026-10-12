@@ -174,6 +174,9 @@ pub(in crate::app) struct SettingsIo<'a> {
     /// `SdroxideApp::rx_site_edit`.
     rx_site: &'a mut Option<sdroxide_types::RxSite>,
     audio_pick: &'a mut Option<(bool, Option<String>)>,
+    /// Which speaker channel(s) the received audio reaches, buffered until the
+    /// window closes (#654).
+    routing_pick: &'a mut Option<sdroxide_types::AudioRouting>,
     hpsdr_discover: &'a mut bool,
     /// The name being typed in the Profiles tab's save box. Owned on the app:
     /// the dialog lives across taps of the tab bar, and a half-typed name is
@@ -1023,6 +1026,7 @@ impl SdroxideApp {
         // Edits collected here and applied after the window closure, which
         // borrows `&self` and so can't touch `&mut self.ctrl`.
         let mut audio_pick: Option<(bool, Option<String>)> = None;
+        let mut routing_pick: Option<sdroxide_types::AudioRouting> = None;
         let mut profile_name = std::mem::take(&mut self.profile_name_edit);
         let mut digi_reseed = false;
         let mut speech_edit = self.speech.settings().clone();
@@ -1194,6 +1198,7 @@ impl SdroxideApp {
                             ranges: &mut ranges,
                             rx_site: &mut rx_site,
                             audio_pick: &mut audio_pick,
+                            routing_pick: &mut routing_pick,
                             hpsdr_discover: &mut hpsdr_discover,
                             profile_name: &mut profile_name,
                             digi_reseed: &mut digi_reseed,
@@ -1396,6 +1401,10 @@ impl SdroxideApp {
         }
         if let Some((output, name)) = audio_pick {
             self.ctrl.set_audio_device(output, name);
+            self.audio_devices_queried = false;
+        }
+        if let Some(routing) = routing_pick {
+            self.ctrl.set_audio_routing(routing);
             self.audio_devices_queried = false;
         }
         // Every device question below is asked after the window closure, which
@@ -1922,7 +1931,7 @@ impl SdroxideApp {
                 // running two rigs at once runs two interfaces at once, and one
                 // pair of pickers on a shared page could only describe one of
                 // them (issue #474).
-                self.settings_user_audio(ui, io.audio_pick);
+                self.settings_user_audio(ui, io.audio_pick, io.routing_pick);
 
                 if let Some(access) = io.access_edit.as_deref_mut() {
                     ui.add_space(10.0);

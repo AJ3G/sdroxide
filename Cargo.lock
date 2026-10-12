@@ -4914,6 +4914,7 @@ version = "1.6.9"
 dependencies = [
  "cpal",
  "rtrb",
+ "sdroxide-types",
  "thiserror 2.0.20",
  "tracing",
 ]

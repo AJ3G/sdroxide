@@ -215,6 +215,9 @@ pub struct Settings {
     pub swr_limit: f32,
     /// Preferred audio output device name; `None` = system default.
     pub audio_output: Option<String>,
+    /// Which speaker channel(s) the received audio reaches (#654). `Both` is
+    /// the default and the old behaviour.
+    pub audio_routing: sdroxide_types::AudioRouting,
     /// Preferred audio input (microphone) device name; `None` = system default.
     pub audio_input: Option<String>,
     /// The published version the operator dismissed the update banner for.
@@ -279,6 +282,7 @@ impl Default for Settings {
             swr_guard: true,
             swr_limit: 2.5,
             audio_output: None,
+            audio_routing: sdroxide_types::AudioRouting::default(),
             audio_input: None,
             dismissed_update: String::new(),
             region: sdroxide_types::Region::default(),

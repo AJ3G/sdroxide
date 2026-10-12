@@ -9,6 +9,7 @@ mod ais;
 mod alert;
 mod aprs;
 mod atchat;
+mod audio;
 mod awards;
 mod band;
 mod band_segments;
@@ -97,6 +98,7 @@ pub use aprs::{
     AprsSymbolKind, AprsTraffic, AprsWeather,
 };
 pub use atchat::{AtChatChatLine, AtChatFile, AtChatRosterEntry, AtChatStatus, AtChatTransfer};
+pub use audio::AudioRouting;
 pub use awards::{
     Awards, Coverage, EntitySlot, Highlight, LogIndex, Novelty, Status as AwardStatus, US_STATES,
     compute_awards, counts, coverage_counts, entity_coverage, entity_name,
