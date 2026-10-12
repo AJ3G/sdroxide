@@ -2208,8 +2208,8 @@ corrections is one too many.
 
 ![Rotator setup](images/rotator.jpg)
 
-sdroxide points motorized antennas as a **Hamlib rotctld client** — configure
-it in Settings ▸ Servers. Run a daemon next to the hardware, for example:
+sdroxide points motorized antennas as a **Hamlib rotctld client**, or through
+**PSTRotator** (below) — configure it in Settings ▸ Servers. Run a daemon next to the hardware, for example:
 
 ```bash
 rotctld -m 603 -r /dev/ttyUSB0    # a Yaesu GS-232B interface
@@ -2224,6 +2224,15 @@ which the rotator parks (set it to your local roofline), an azimuth offset for
 a rotator whose north is off, the smallest movement worth commanding (motors
 last longer not chasing tenths of a degree), and an optional park position.
 The status line shows where the hardware actually reports itself pointing.
+
+**PSTRotator** works too: choose it under **Program**, with the host it runs
+on and its UDP control port (12000 unless you changed it). In PSTRotator, turn
+on **UDP Control** in Setup. sdroxide takes over from PSTRotator's own tracking
+when it starts pointing, and asks where the antenna is once a second; PSTRotator
+answers on the next port up (12001), which must be free on the machine
+sdroxide runs on. Until it answers the status line says so — PSTRotator stays
+silent while it has no controller connected — but the pointing commands still
+go out.
 
 ### 2.17 Running more than one radio
 

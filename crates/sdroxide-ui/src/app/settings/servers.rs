@@ -325,12 +325,7 @@ pub(in crate::app) fn settings_rotator_tab(
     status: &Option<(bool, f64, f64, Option<String>)>,
     apply: &mut bool,
 ) {
-    ui.label(
-        RichText::new("Antenna rotator (rotctld client)")
-            .size(14.0)
-            .strong()
-            .color(crate::theme::CYAN()),
-    );
+    ui.label(RichText::new("Antenna rotator").size(14.0).strong().color(crate::theme::CYAN()));
     ui.add_space(4.0);
     if !seeded {
         ui.label(RichText::new("Waiting for the station's rotator configuration…").weak());
@@ -340,8 +335,9 @@ pub(in crate::app) fn settings_rotator_tab(
         RichText::new(
             "Points a motorized antenna at the satellite you are locked onto, through a Hamlib \
              rotctld daemon (run e.g. \u{201c}rotctld -m 603 -r /dev/ttyUSB0\u{201d} for a GS-232B \
-             rotator, or \u{201c}rotctld -m 1\u{201d} to try it without hardware). One daemon covers \
-             every rotator Hamlib drives — EasyComm, GS-232, SPID and the rest.",
+             rotator, or \u{201c}rotctld -m 1\u{201d} to try it without hardware) — one daemon covers \
+             every rotator Hamlib drives — or through PSTRotator, with UDP Control enabled in \
+             its Setup.",
         )
         .weak(),
     );
@@ -350,6 +346,21 @@ pub(in crate::app) fn settings_rotator_tab(
     ui.add_space(6.0);
     ui.add_enabled_ui(cfg.enabled, |ui| {
         egui::Grid::new("rotator-grid").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
+            ui.label("Program");
+            let was = cfg.protocol;
+            super::enum_combo(
+                ui,
+                "rotator-protocol",
+                &mut cfg.protocol,
+                &sdroxide_types::RotatorProtocol::ALL,
+                sdroxide_types::RotatorProtocol::label,
+            );
+            // A port still on the old program's default follows to the new one's.
+            if cfg.protocol != was && cfg.port == was.default_port() {
+                cfg.port = cfg.protocol.default_port();
+            }
+            ui.end_row();
+
             ui.label("Host");
             crate::chrome::field(
                 ui,
@@ -360,8 +371,11 @@ pub(in crate::app) fn settings_rotator_tab(
             ui.end_row();
 
             ui.label("Port");
-            ui.add(egui::DragValue::new(&mut cfg.port).range(1..=65535))
-                .on_hover_text("4533 is rotctld's default");
+            ui.add(egui::DragValue::new(&mut cfg.port).range(1..=65535)).on_hover_text(
+                "4533 is rotctld's default. PSTRotator's UDP control port is 12000 by \
+                     default, and it answers position queries on the next port up, 12001 — \
+                     which has to be free on this machine.",
+            );
             ui.end_row();
 
             ui.label("Min elevation");

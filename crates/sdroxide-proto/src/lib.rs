@@ -1541,7 +1541,12 @@ use sdroxide_types::{
 /// v178: [`sdroxide_types::RadioConfig`] gains `same_gain_all_bands` (`bool`)
 /// on its tail — the switch for remembering receive gain per band (issue #605).
 /// Same break as v176.
-pub const PROTO_VERSION: u16 = 178;
+///
+/// v179: [`sdroxide_types::RotatorConfig`] gains `protocol`
+/// ([`sdroxide_types::RotatorProtocol`], a unit enum) on its tail — rotctld or
+/// PSTRotator's UDP control (issue #638). It rides `Command::SetRotatorConfig`
+/// and `StationConfig::rotator` whole, so a v178 peer reads it out of step.
+pub const PROTO_VERSION: u16 = 179;
 const VERSION_BYTE: u8 = 0x12;
 
 #[derive(Debug, thiserror::Error)]
@@ -2417,6 +2422,31 @@ mod tests {
         let back: ClientMsg = decode(&encode(&cmd).unwrap()).unwrap();
         assert_eq!(back, cmd);
         let cmd = ClientMsg::Command(Command::RefreshTleSubs);
+        let back: ClientMsg = decode(&encode(&cmd).unwrap()).unwrap();
+        assert_eq!(back, cmd);
+    }
+
+    /// The rotator's program choice (#638) survives the wire, both ways, with
+    /// the park position before it off its default.
+    #[test]
+    fn roundtrip_rotator_config() {
+        use sdroxide_types::{RotatorConfig, RotatorProtocol, StationConfig};
+
+        let rotator = RotatorConfig {
+            enabled: true,
+            host: "shack-pc".into(),
+            port: 12000,
+            park: Some((180.0, 10.0)),
+            protocol: RotatorProtocol::PstRotator,
+            ..RotatorConfig::default()
+        };
+        let m = ServerMsg::StationConfig(Box::new(StationConfig {
+            rotator: rotator.clone(),
+            ..no_station()
+        }));
+        let back: ServerMsg = decode(&encode(&m).unwrap()).unwrap();
+        assert_eq!(back, m);
+        let cmd = ClientMsg::Command(Command::SetRotatorConfig(rotator));
         let back: ClientMsg = decode(&encode(&cmd).unwrap()).unwrap();
         assert_eq!(back, cmd);
     }
