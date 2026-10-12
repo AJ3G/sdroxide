@@ -3988,6 +3988,11 @@ not to have sent the mistake. Each mode's submode is chosen on its setup page
   coding. Choose the **tone count** (2, 4, 8, 16, 32, 64) and **bandwidth**
   (125–2000 Hz). The symbol rate is bandwidth ÷ tones; **32/1000** and **16/500**
   are the common combinations. Both stations must use the same tones/bandwidth.
+  The modem follows fldigi's (Pawel Jalocha's reference design) bit for bit —
+  scrambler, interleaver and the raised-cosine symbols — so it works with
+  fldigi and MultiPSK. The receiver searches about four tones either side of
+  where you tuned, and prints a block a few blocks after it arrives, because that
+  is how long it takes to be sure of it.
 - **THOR** — a DominoEX-family 18-tone mode using incremental frequency keying
   (IFK+) with convolutional forward error correction. Choose a submode
   (**THOR4 … THOR32**); THOR16 is the usual default. The tone bank edges are drawn
