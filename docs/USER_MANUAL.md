@@ -7393,7 +7393,11 @@ was belonged to the receiver you have just left.
 **Audio to** sends this radio's audio to **both channels** (the default, with a
 sub receiver on the right), or to the **left** or **right** channel only — two
 radios on one headset, one in each ear. A sub receiver is then mixed into the
-same ear. Recordings are not affected. Applies at once.
+same ear. Recordings are not affected. Applies at once. It is the per-radio
+counterpart of **Channels** under General
+([6.1](#61-general-station-audio-and-remote-access)), which sends *everything*
+you hear to one side; that one is applied last, so with it on **Left only** a
+radio set to the right here is heard on the left too.
 
 **Gain per band** — on by default — gives each band back the receive gain you
 last set on it when the dial returns there, however it got there: a band
