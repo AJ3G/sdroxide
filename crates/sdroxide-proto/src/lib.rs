@@ -1533,7 +1533,11 @@ use sdroxide_types::{
 /// tail — a per-radio S-meter calibration, settable from the UI (issue #642).
 /// `RadioConfig` rides `ServerMsg::RadioConfig` and `Command::SetRadioConfig`
 /// whole, so a v175 peer reads the extra bytes as the start of the next field.
-pub const PROTO_VERSION: u16 = 176;
+///
+/// v177: [`sdroxide_types::RadioConfig`] gains `audio_route`
+/// ([`sdroxide_types::AudioRoute`], a unit enum) on its tail — which speaker
+/// channels the radio plays to (issue #654). Same break as v176.
+pub const PROTO_VERSION: u16 = 177;
 const VERSION_BYTE: u8 = 0x12;
 
 #[derive(Debug, thiserror::Error)]
@@ -2541,6 +2545,7 @@ mod tests {
             // The new tail field, off its default so a peer one version behind
             // cannot pass this by reading zeros.
             s_meter_cal_db: -42.5,
+            audio_route: sdroxide_types::AudioRoute::Right,
             // The transmit converter is an enum with a payload on one variant
             // only — the shape a self-describing format forgives and postcard
             // does not, so it is carried here rather than left at its default.

@@ -7349,7 +7349,7 @@ with it. That matters most when a tab is pointed at a public receiver
 brings a range of its own: the transceiver that was in the tab gets its own
 ranges back when you switch the interface back to it.
 
-**Antenna is**, the last row of the block, says where this radio actually
+**Antenna is** says where this radio actually
 listens from. *At the station* — the default — means the antenna is yours, so
 your own locator (**My grid**,
 [3.2.1](#321-one-time-setup-your-callsign-and-grid)) describes it. *Somewhere else*
@@ -7370,6 +7370,14 @@ somebody else's antenna from your own square is worse than not reporting it.
 Like the ranges above, it belongs to the interface it was typed for: changing
 **Radio interface** puts it back to *At the station*, because where the antenna
 was belonged to the receiver you have just left.
+
+**Audio to** sends this radio's audio to **both channels** (the default, with a
+sub receiver on the right), or to the **left** or **right** channel only — two
+radios on one headset, one in each ear. A sub receiver is then mixed into the
+same ear. Recordings are not affected. Applies at once.
+
+**S-meter calibration** is added to this radio's S-meter reading, and applies as
+you drag it; see [2.9](#29-the-s-meter) for why an SDR needs it.
 
 **Transmit drive by band** is a calibration table, one trim per band, that makes
 one **Drive** setting mean one output power everywhere. Every amplifier has a

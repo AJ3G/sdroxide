@@ -2235,6 +2235,26 @@ impl SdroxideApp {
                     });
                     ui.end_row();
 
+                    // Which speaker channels this radio plays to (#654): one ear
+                    // only puts two radios on one headset, a sub receiver mixed
+                    // into the same ear. Live: an ear is chosen by listening.
+                    ui.label(RichText::new("Audio to").strong());
+                    let was = cfg.audio_route;
+                    enum_combo(
+                        ui,
+                        "audio-route",
+                        &mut cfg.audio_route,
+                        &sdroxide_types::AudioRoute::ALL,
+                        sdroxide_types::AudioRoute::label,
+                    );
+                    if cfg.audio_route != was {
+                        cmds.push(Command::SetRadioConfig {
+                            cfg: Box::new(cfg.clone()),
+                            reopen: false,
+                        });
+                    }
+                    ui.end_row();
+
                     // Live, like the receive audio trim: it is set by watching
                     // the S-meter while dragging (#642).
                     ui.label(RichText::new("S-meter calibration").strong());

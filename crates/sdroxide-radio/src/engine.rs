@@ -1455,6 +1455,21 @@ struct StereoMixer {
     /// has to be where the ring is filled, after ducking and the AF rail have
     /// had their say.
     trim: f32,
+    /// Which speaker channels the audio goes to (#654). Applied last, after the
+    /// clamp, so one ear only is the same audio and never louder.
+    route: sdroxide_types::AudioRoute,
+}
+
+/// One output frame on its way to the speakers, sent where `route` says. With
+/// a sub receiver the two are mixed into the one ear rather than one dropped.
+fn route_frame(route: sdroxide_types::AudioRoute, l: f32, r: f32, dual: bool) -> (f32, f32) {
+    use sdroxide_types::AudioRoute;
+    let mono = if dual { 0.5 * (l + r) } else { l };
+    match route {
+        AudioRoute::Both => (l, r),
+        AudioRoute::Left => (mono, 0.0),
+        AudioRoute::Right => (0.0, mono),
+    }
 }
 
 /// Bound on per-channel queueing (≈¼ s at 48 kHz) so a stalled side can't
@@ -1479,7 +1494,13 @@ impl StereoMixer {
             duck: 1.0,
             tx_muted: false,
             trim: 1.0,
+            route: sdroxide_types::AudioRoute::Both,
         }
+    }
+
+    /// Which speaker channels to play to. See [`sdroxide_types::AudioRoute`].
+    fn set_route(&mut self, route: sdroxide_types::AudioRoute) {
+        self.route = route;
     }
 
     /// Set the speaker-path attenuation. See [`StereoMixer::duck`].
@@ -1586,6 +1607,7 @@ impl StereoMixer {
                     // wrap is a click at the loudest the card can go.
                     let l = (self.main_q[i] * g).clamp(-1.0, 1.0);
                     let r = if dual { (self.sub_q[i] * g).clamp(-1.0, 1.0) } else { l };
+                    let (l, r) = route_frame(self.route, l, r, dual);
                     let _ = self.out.push(l);
                     let _ = self.out.push(r);
                 }
@@ -2456,6 +2478,8 @@ struct Engine {
     /// card changes, and a rebuilt mixer has to be told again.
     /// See [`sdroxide_types::RadioConfig::rx_audio_gain_db`].
     rx_af_gain_db: f32,
+    /// See [`sdroxide_types::RadioConfig::audio_route`].
+    audio_route: sdroxide_types::AudioRoute,
     /// See [`sdroxide_types::RadioConfig::s_meter_cal_db`]: this radio's S-meter
     /// calibration, on top of the station's `cal_offset_db`.
     radio_cal_db: f32,
@@ -4042,6 +4066,7 @@ fn engine_thread(
         drive_trim: radio_cfg.tx_drive_trim.clone(),
         tx_drive_max: radio_cfg.tx_drive_ceiling(),
         rx_af_gain_db: radio_cfg.rx_audio_gain_db,
+        audio_route: radio_cfg.audio_route,
         radio_cal_db: radio_cfg.s_meter_cal_db,
         tx_center_hz: 0.0,
         tx_ham_only: engine_cfg.tx_ham_only,
@@ -9855,6 +9880,7 @@ impl Engine {
                 // at the next reopen, because an operator setting it is
                 // listening to the radio while they drag the control.
                 self.rx_af_gain_db = cfg.rx_audio_gain_db;
+                self.audio_route = cfg.audio_route;
                 self.refresh_af_trim();
                 // And the S-meter calibration, live for the same reason: it is
                 // set by watching the meter while dragging the control.
@@ -14778,6 +14804,7 @@ impl Engine {
                 // Nor may it come back without the operator's trim: a rig whose
                 // codec is quiet is quiet on every sound card.
                 mixer.set_trim_db(self.rx_af_gain_db);
+                mixer.set_route(self.audio_route);
                 self.mixer = Some(mixer);
                 self.audio_out_rate = a.out_rate;
                 self.sub = self.state.sub_rx_enabled.then(|| {
@@ -15700,8 +15727,10 @@ impl Engine {
     /// from the same field.
     fn refresh_af_trim(&mut self) {
         let db = self.rx_af_gain_db;
+        let route = self.audio_route;
         if let Some(mixer) = self.mixer.as_mut() {
             mixer.set_trim_db(db);
+            mixer.set_route(route);
         }
     }
 
@@ -17947,6 +17976,31 @@ mod recording_tap_tests {
 
     fn drained(cons: &mut rtrb::Consumer<f32>) -> Vec<f32> {
         std::iter::from_fn(|| cons.pop().ok()).collect()
+    }
+
+    /// Issue #654: one ear only. The radio's audio goes to the chosen side and
+    /// the other is silent; a sub receiver is mixed into that side, not lost.
+    /// The recording is not the speakers' business and is left alone.
+    #[test]
+    fn the_route_puts_the_radio_in_one_ear() {
+        use sdroxide_types::AudioRoute;
+        let (out, mut speaker) = rtrb::RingBuffer::<f32>::new(64);
+        let (tap, mut rec) = rtrb::RingBuffer::<f32>::new(64);
+        let mut mixer = StereoMixer::new(out);
+        mixer.rec_tap = Some(tap);
+
+        mixer.set_route(AudioRoute::Left);
+        mixer.push(&[0.5], None, &[0.5], None);
+        assert_eq!(drained(&mut speaker), vec![0.5, 0.0]);
+        assert_eq!(drained(&mut rec), vec![0.5, 0.5]);
+
+        mixer.set_route(AudioRoute::Right);
+        mixer.push(&[0.5], Some(&[0.25]), &[0.5], Some(&[0.25]));
+        assert_eq!(drained(&mut speaker), vec![0.0, 0.375]);
+
+        mixer.set_route(AudioRoute::Both);
+        mixer.push(&[0.5], Some(&[0.25]), &[0.5], Some(&[0.25]));
+        assert_eq!(drained(&mut speaker), vec![0.5, 0.25]);
     }
 
     /// A stereo recording splits RX and TX into an ear each only when there is

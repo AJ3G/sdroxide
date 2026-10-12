@@ -6813,6 +6813,30 @@ impl PanadapterTap {
     }
 }
 
+/// Which speaker channels a radio's audio goes to (#654): both, or one ear
+/// only — two radios on one headset, one per side.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum AudioRoute {
+    /// Both channels: a sub receiver on the right, as it always was.
+    #[default]
+    Both,
+    /// The left channel only, the main and sub receivers mixed into it.
+    Left,
+    /// The right channel only, the main and sub receivers mixed into it.
+    Right,
+}
+
+impl AudioRoute {
+    pub const ALL: [AudioRoute; 3] = [AudioRoute::Both, AudioRoute::Left, AudioRoute::Right];
+    pub fn label(self) -> &'static str {
+        match self {
+            AudioRoute::Both => "Both channels",
+            AudioRoute::Left => "Left only",
+            AudioRoute::Right => "Right only",
+        }
+    }
+}
+
 /// Which of the two radios you listen to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum PanadapterAudio {
@@ -7442,6 +7466,9 @@ pub struct RadioConfig {
     /// `0.0` in a configuration written before this existed: the meter reads
     /// exactly as it did. Appended last, as every field here is.
     pub s_meter_cal_db: f32,
+    /// Which speaker channels this radio's audio goes to. See [`AudioRoute`].
+    /// `Both` in a configuration written before this existed. Appended last.
+    pub audio_route: AudioRoute,
 }
 
 impl RadioConfig {
