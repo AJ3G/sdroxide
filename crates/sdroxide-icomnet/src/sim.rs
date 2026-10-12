@@ -253,6 +253,11 @@ impl Sim {
             .unwrap_or(self.menu_default)
     }
 
+    /// Change a menu item from the radio's front panel.
+    pub fn set_menu_item(&self, item: u16, value: u8) {
+        self.recorded.lock().unwrap_or_else(|e| e.into_inner()).menu.insert(item, value);
+    }
+
     /// Whether the client has pinged the audio stream.
     pub fn audio_pinged(&self) -> bool {
         self.recorded.lock().unwrap_or_else(|e| e.into_inner()).audio_pinged

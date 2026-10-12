@@ -386,7 +386,11 @@ impl IqSource for PanadapterSource {
 
     fn prepare_receive_mode(&mut self, mode: Mode) -> Result<Option<bool>> {
         let old_rate = self.ctrl.sample_rate();
-        self.ctrl.prepare_receive_mode(mode)?;
+        // The wideband receiver demodulates the mode whatever the control
+        // rig's own receive path can do, so its refusal is not this source's.
+        if let Err(e) = self.ctrl.prepare_receive_mode(mode) {
+            warn!("control rig receive path for {mode:?}: {e}");
+        }
         if self.ctrl.sample_rate() != old_rate {
             self.audio_q.clear();
             self.last_audio_pull = None;
