@@ -13940,7 +13940,9 @@ impl Engine {
     /// and the two never met. A refusal the operator cannot see is
     /// indistinguishable from a bug in whatever asked to key.
     fn deny_tx(&mut self, reason: &str) {
-        warn!("TX refused: {reason}");
+        // Named, because a station runs several radios and the refusal is
+        // often one nobody pressed — a WSPR schedule on an idle tab (#566).
+        warn!("TX refused on radio {} ({:?}): {reason}", self.instance + 1, self.state.rx[0].mode);
         self.state.tx.ptt = false;
         self.state.tx.tune = false;
         // Every deny happens before the transmitter keyed, so a gate claimed
