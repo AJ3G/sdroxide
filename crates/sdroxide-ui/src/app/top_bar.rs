@@ -3384,6 +3384,17 @@ impl SdroxideApp {
         // counting `tx` as signal is what keeps a file open through one. A
         // missing meter reads as no signal, which arms nothing until one
         // arrives.
+        // A squelch dragged fully open after arming makes every frame signal,
+        // so one file would grow for ever; the gate sits idle until it is set.
+        if self
+            .state
+            .rx
+            .first()
+            .is_some_and(|rx| rx.squelch_db <= sdroxide_types::SQUELCH_OPEN_DB + 0.5)
+        {
+            self.rec_gate = Default::default();
+            return;
+        }
         let signal = match (self.meters.as_ref(), self.state.rx.first()) {
             (Some(m), Some(rx)) => {
                 let tone_ok = rx.tone_sql.is_none_or(|want| m.tone == Some(want));
@@ -3516,9 +3527,13 @@ impl SdroxideApp {
                     )
                 };
                 if crate::chrome::chip(ui, armed || pending, label).on_hover_text(hint).clicked() {
-                    // A clip is one span; it replaces any longer deadline.
+                    // A clip is one span; it replaces any longer deadline and
+                    // the auto-record gate, which would otherwise close it on
+                    // the first stretch of silence.
                     // Running already, the span starts now; idle, the recording
                     // is asked for and the span is armed once it is up.
+                    self.rec_gate_s = None;
+                    self.rec_gate = Default::default();
                     if audio {
                         self.recording_stop_at = Some((now + i64::from(secs), secs));
                         self.rec_clip = None;
@@ -3611,7 +3626,11 @@ impl SdroxideApp {
         // own passband power, which only an SDR front end publishes (a CAT
         // rig's squelch is the rig's, and its meters carry no such number).
         let squelch_open = self.state.rx[0].squelch_db <= sdroxide_types::SQUELCH_OPEN_DB + 0.5;
-        let have_scale = self.meters.as_ref().map(|m| m.passband_dbfs.is_finite()).unwrap_or(true);
+        let have_scale = self
+            .meters
+            .as_ref()
+            .map(|m| m.tx.is_some() || m.passband_dbfs.is_finite())
+            .unwrap_or(true);
         let block: Option<&str> = if squelch_open {
             Some("Set a squelch — auto-record needs one to know silence")
         } else if !have_scale {
@@ -6025,21 +6044,7 @@ fn gate_arm_clears_stop_after(secs: Option<u16>) -> bool {
     secs.is_some()
 }
 
-/// The silence auto-split decision for one frame:
-/// `(start a recording, stop the recording, the silence run to carry)`.
-///
-/// `signal` is the receiver's squelch — true while the passband is at or above
-/// the operator's threshold. While `hold_s` is armed the MP3 recording follows
-/// it: a signal that is not already being recorded starts a file, and a file
-/// that has been silent for `hold_s` seconds is closed. `silent_since` carries
-/// the start of the current run between frames and the returned value replaces
-/// it, so a run is measured across frames rather than restarted each one.
-///
-/// Off (`hold_s == None`) is inert whatever the signal and the recording do,
-/// which is what makes disarming leave a manual recording alone.
-///
-/// The state is carried in one value rather than a handful of fields so the
-/// whole decision stays in one place and one test can drive it frame by frame.
+/// The silence auto-split gate's state, carried from one frame to the next.
 #[derive(Clone, Copy, Default, PartialEq, Debug)]
 pub(in crate::app) struct RecGate {
     /// When the current run of silence inside a recording began.
@@ -6088,6 +6093,21 @@ fn rec_chip_fill(now: f64) -> Color32 {
     )
 }
 
+/// The silence auto-split decision for one frame:
+/// `(the state to carry, start a recording, stop the recording)`.
+///
+/// `signal` is the receiver's squelch — true while the passband is at or above
+/// the operator's threshold. While `hold_s` is armed the MP3 recording follows
+/// it: a signal that is not already being recorded starts a file, and a file
+/// that has been silent for `hold_s` seconds is closed. `silent_since` carries
+/// the start of the current run between frames and the returned value replaces
+/// it, so a run is measured across frames rather than restarted each one.
+///
+/// Off (`hold_s == None`) is inert whatever the signal and the recording do,
+/// which is what makes disarming leave a manual recording alone.
+///
+/// The state is carried in one value rather than a handful of fields so the
+/// whole decision stays in one place and one test can drive it frame by frame.
 fn rec_gate_tick(
     now: i64,
     hold_s: Option<u16>,
@@ -7251,7 +7271,8 @@ mod tests {
     fn the_gates_own_stop_does_not_hold_off_the_next_transmission() {
         // Recording, silent for the length of the hold: the gate asks to stop
         // and says so.
-        let running = RecGate { silent_since: Some(200), was_recording: true, ..RecGate::default() };
+        let running =
+            RecGate { silent_since: Some(200), was_recording: true, ..RecGate::default() };
         let (asked, start, stop) = rec_gate_tick(203, Some(3), true, false, running);
         assert!(stop && !start);
         assert!(asked.stop_asked, "the gate marks the stop as its own");

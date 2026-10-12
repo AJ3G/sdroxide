@@ -2936,9 +2936,11 @@ after**, not a stored preference, and arming one clears the other — they are t
 answers to when a recording ends. Setting this row to **off** only stops
 following the squelch; a **Stop after** timer or a quick clip already running is
 left alone. It keeps running for a radio whose tab is not the one on screen, so
-a monitor can be left in the background. It needs a front end whose squelch the
-program
-itself applies (an SDR); a CAT radio's squelch belongs to the radio and its
+a monitor can be left in the background — but the program's window has to stay
+open: while it is minimised, some desktops stop drawing it, and then nothing is
+started or closed (the same holds for **Stop after**). A quick clip, or a
+**Stop after** time, disarms auto-record. It needs a front end whose squelch the
+program itself applies (an SDR); a CAT radio's squelch belongs to the radio and its
 meters carry no passband level to follow, so the row says that rather than
 arming a recorder that would never close. The REC chip shows the difference:
 armed but waiting is a steady red outline, while a file actually being written
