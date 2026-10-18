@@ -15,9 +15,10 @@
 //!   rather than a count of lit bars, and it carries its own "this reading is
 //!   not to be trusted" flag, which is set in receive, below 500 mW, and after
 //!   a high-SWR trip.
-//! * **Power is nine fixed steps, not watts.** `TP` selects 0.3, 0.5, 1.0, 1.2,
-//!   1.5, 2.0, 3.0, 4.0 or 5.0 W — a Kenwood-shaped `PC050;` is a syntax error,
-//!   and even read as an index it would be five times the rig's whole output.
+//! * **Power is nine fixed steps plus MAX, not watts.** `TP` selects 0.3, 0.5,
+//!   1.0, 1.2, 1.5, 2.0, 3.0, 4.0 or 5.0 W, or MAX — a Kenwood-shaped `PC050;`
+//!   is a syntax error. sdroxide sets MAX once at open and then controls the
+//!   output with the transmit audio level — see [`TX_POWER_MAX_FRAME`].
 //! * **The receive filter is `RF`, indexed per mode.** Three different tables
 //!   behind one command, and the mode digit selects which — see [`filter_index`].
 //! * **Split is `SP`, and `FR0;` does not cancel it.** `SP0;` is the only thing
@@ -51,25 +52,17 @@ use tracing::{debug, info};
 /// the same width as Kenwood and Elecraft and unlike Yaesu, which has two.
 const FREQ_DIGITS: usize = 11;
 
-/// What the transmitter puts out at each of `TP`'s nine settable steps, in
-/// watts. Index into this array *is* the command's parameter.
+/// Pins the rig's power register (`TP`, menu 34 `TX POWER`) at MAX. Sent once
+/// when the port opens and never changed afterwards: the Drive and TUNE
+/// sliders set the output by scaling the transmit audio instead (see
+/// [`Protocol::power_by_audio`]).
 ///
-/// The tenth setting, `TP09`, is "MAX": more than 5 W by an amount ELAD does
-/// not publish and which is not the same on every band. It is accepted from the
-/// radio — an operator who set MAX at the front panel should see a full slider
-/// rather than a needle that fell off the bottom — and it is what the top of
-/// the Drive slider commands (see [`MAX_POWER_FRAC`]).
-const TX_POWER_STEPS_W: [f32; 9] = [0.3, 0.5, 1.0, 1.2, 1.5, 2.0, 3.0, 4.0, 5.0];
-
-/// The `TP` parameter for "MAX".
-const TX_POWER_MAX_CODE: u32 = 9;
-
-/// Drive fraction at and above which `TP09` (MAX) is sent instead of a
-/// numbered step. Just under 1.0 so float rounding at 100% still lands on MAX.
-const MAX_POWER_FRAC: f32 = 0.995;
-
-/// Watts at the top of the Drive slider. The highest step that means a number.
-const FULL_POWER_W: f32 = 5.0;
+/// Why MAX and not a numbered step (0.3 … 5.0 W): the USB sound-card audio a
+/// DUO receives from a PC is low enough that the rig needs MAX to reach even
+/// 5 W, so any lower setting caps the output below what the sliders ask for.
+/// And why never touched again: a numbered step written from a slider would
+/// overwrite the operator's MAX and leave the rig there after sdroxide exits.
+const TX_POWER_MAX_FRAME: &str = "TP09;";
 
 /// `SM` reading → dBm, from the manual's own table.
 ///
@@ -409,6 +402,8 @@ impl Protocol for Elad {
         if let Some(d) = tx_input_digit(self.tx_input) {
             frames.push(format!("TI{d};").into_bytes());
         }
+        // Power register to MAX, once. The sliders work on the audio from here.
+        frames.push(TX_POWER_MAX_FRAME.as_bytes().to_vec());
         frames
     }
 
@@ -432,37 +427,26 @@ impl Protocol for Elad {
         true
     }
 
-    fn set_power(&mut self, frac: f32) -> Vec<Vec<u8>> {
-        // The top of the slider is MAX, not 5 W: Drive wide open should leave
-        // the rig's power menu on MAX. The TUNE level is commanded through here
-        // too, so anything below the top still picks a numbered step and a
-        // tune carrier stays at its own lower level.
-        if frac >= MAX_POWER_FRAC {
-            return vec![format!("TP{TX_POWER_MAX_CODE:02};").into_bytes()];
-        }
-        let want = frac.clamp(0.0, 1.0) * FULL_POWER_W;
-        // Nearest step rather than the next one down: the steps are coarse and
-        // unevenly spaced at the bottom (0.3, 0.5, 1.0), so rounding down would
-        // put most of the lower half of the slider on 0.3 W.
-        let idx = TX_POWER_STEPS_W
-            .iter()
-            .enumerate()
-            .min_by(|(_, a), (_, b)| {
-                (**a - want)
-                    .abs()
-                    .partial_cmp(&(**b - want).abs())
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-        vec![format!("TP{idx:02};").into_bytes()]
+    /// Nothing on the wire: the power register stays on the MAX that
+    /// [`Protocol::clear_offsets`] set, and the level is applied to the audio
+    /// by the source (see [`Protocol::power_by_audio`]).
+    fn set_power(&mut self, _frac: f32) -> Vec<Vec<u8>> {
+        Vec::new()
     }
 
+    /// Not read: adopting the rig's `TP` would put the Drive slider at 100%
+    /// every time it reported MAX.
     fn read_power(&self) -> Vec<Vec<u8>> {
-        vec![b"TP;".to_vec()]
+        Vec::new()
     }
 
+    /// True so the engine keeps handing the source the Drive level, and the
+    /// TUNE level while tuning, before each key-down.
     fn commands_power(&self) -> bool {
+        true
+    }
+
+    fn power_by_audio(&self) -> bool {
         true
     }
 
@@ -517,15 +501,10 @@ impl Protocol for Elad {
                 if let Some(swr) = parse_swr(rest) {
                     out.push(CatUpdate::Swr(swr));
                 }
-            } else if let Some(rest) = msg.strip_prefix("TP") {
-                if let Ok(code) = rest.trim().parse::<u32>() {
-                    let w = if code == TX_POWER_MAX_CODE {
-                        FULL_POWER_W
-                    } else {
-                        *TX_POWER_STEPS_W.get(code as usize).unwrap_or(&0.0)
-                    };
-                    out.push(CatUpdate::Power((w / FULL_POWER_W).clamp(0.0, 1.0)));
-                }
+            } else if msg.starts_with("TP") {
+                // Not reported: the power register is pinned at MAX and the
+                // Drive slider is an audio level, so the rig's `TP` says
+                // nothing about where the slider should sit.
             } else if let Some(rest) = msg.strip_prefix("AN") {
                 // "How many antennas" as the rig puts it, which is the same
                 // question as "which socket is the receiver on".
@@ -779,33 +758,21 @@ mod tests {
     }
 
     #[test]
-    fn power_is_nine_fixed_steps_not_watts() {
+    fn power_is_pinned_at_max_and_the_sliders_never_touch_it() {
         let mut e = elad();
-        // The top of the slider is MAX; the bottom is the lowest step.
-        assert_eq!(frames(e.set_power(1.0)), vec!["TP09;"]); // MAX
-        assert_eq!(frames(e.set_power(0.0)), vec!["TP00;"]); // 0.3 W
-        // Nearest step, not the next one down — the steps are coarse and
-        // uneven at the bottom.
-        assert_eq!(frames(e.set_power(0.4)), vec!["TP05;"]); // 2.0 W
-        assert_eq!(frames(e.set_power(0.6)), vec!["TP06;"]); // 3.0 W
-        assert_eq!(frames(e.set_power(0.95)), vec!["TP08;"]); // 5.0 W
-        // TUNE goes through here too: a low tune level stays low.
-        assert_eq!(frames(e.set_power(0.05)), vec!["TP00;"]); // 0.3 W
-        assert_eq!(frames(e.set_power(0.2)), vec!["TP02;"]); // 1.0 W
-        // Only the very top of the slider is MAX.
-        for pct in 0..=99 {
-            let f = frames(e.set_power(pct as f32 / 100.0));
-            assert_ne!(f[0], "TP09;", "{pct}%");
+        // MAX goes out once, at open.
+        assert!(frames(e.clear_offsets()).contains(&"TP09;".to_string()));
+        // The sliders put nothing on the wire — the level is the audio's.
+        for pct in 0..=100 {
+            assert!(e.set_power(pct as f32 / 100.0).is_empty(), "{pct}%");
         }
-        // A Kenwood-shaped watts value is not what goes out.
-        assert!(!frames(e.set_power(1.0))[0].starts_with("PC"));
-
-        assert_eq!(frames(e.read_power()), vec!["TP;"]);
-        assert_eq!(parse_str(&mut e, "TP08;"), vec![CatUpdate::Power(1.0)]);
-        assert_eq!(parse_str(&mut e, "TP02;"), vec![CatUpdate::Power(0.2)]); // 1.0 W
-        // MAX is accepted from the radio, so an operator who set it at the
-        // front panel sees a full slider rather than a fallen needle.
-        assert_eq!(parse_str(&mut e, "TP09;"), vec![CatUpdate::Power(1.0)]);
+        assert!(e.commands_power());
+        assert!(e.power_by_audio());
+        // The rig's own setting is neither asked for nor adopted, so a MAX
+        // reported back cannot drag the Drive slider to 100%.
+        assert!(e.read_power().is_empty());
+        assert!(parse_str(&mut e, "TP09;").is_empty());
+        assert!(parse_str(&mut e, "TP02;").is_empty());
     }
 
     #[test]
@@ -838,7 +805,7 @@ mod tests {
     #[test]
     fn the_open_sequence_clears_what_the_dial_already_carries() {
         let f = frames(elad().clear_offsets());
-        assert_eq!(f, vec!["RT0;", "RC;", "SP0;", "FR0;", "DT;", "VS;", "TI1;"]);
+        assert_eq!(f, vec!["RT0;", "RC;", "SP0;", "FR0;", "DT;", "VS;", "TI1;", "TP09;"]);
         // Split off with the command this family has. `FR0;` alone does not
         // cancel it here, and Yaesu's `FT2;` is not a command at all.
         assert!(f.contains(&"SP0;".to_string()));

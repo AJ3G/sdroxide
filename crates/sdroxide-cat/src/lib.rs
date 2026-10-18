@@ -392,6 +392,14 @@ trait Protocol: Send {
     fn commands_power(&self) -> bool {
         false
     }
+    /// Whether the Drive and TUNE levels are applied by scaling the transmit
+    /// audio rather than by a power command. True for a family whose power
+    /// register is pinned at its maximum when the port opens (see
+    /// [`Protocol::clear_offsets`]); its [`Protocol::set_power`] sends nothing,
+    /// and the source scales the audio it hands the rig instead.
+    fn power_by_audio(&self) -> bool {
+        false
+    }
 
     /// Set the receiver's squelch threshold, as a `0..1` fraction of the rig's
     /// own scale — `0` open, `1` closed, the way the front-panel knob reads.
@@ -1307,6 +1315,7 @@ pub struct CatHandle {
     scope: std::sync::Arc<std::sync::Mutex<Option<ScopeFrame>>>,
     cw_chunk_len: usize,
     commands_power: bool,
+    power_by_audio: bool,
     commands_filter: bool,
     commands_squelch: bool,
     antennas: &'static [&'static str],
@@ -1379,6 +1388,12 @@ impl CatHandle {
     /// Whether [`Self::set_power`] reaches this rig.
     pub fn commands_power(&self) -> bool {
         self.commands_power
+    }
+    /// Whether this rig's power is set by scaling the transmit audio — see
+    /// [`Protocol::power_by_audio`]; the gain to use is
+    /// [`audio_gain_for_power`].
+    pub fn power_by_audio(&self) -> bool {
+        self.power_by_audio
     }
     /// Set the receiver's squelch threshold, as a `0..1` fraction of the rig's
     /// own scale (`0` open, `1` closed). Silently ignored on a family with no
@@ -1732,6 +1747,18 @@ pub fn effective_cw_keying(cfg: &CatConfig) -> CwKeying {
     }
 }
 
+/// The TX audio amplitude for a `0..1` power fraction on a rig whose power is
+/// set by the audio level ([`Protocol::power_by_audio`]).
+///
+/// The square root, because output power follows the square of the amplitude:
+/// this keeps the Drive and TUNE sliders reading as a fraction of power, the
+/// same as they do on a rig with a power command. 100% is unity — the audio
+/// goes out exactly as loud as it does without this — so the slider can only
+/// ever take level away, never add clipping.
+pub fn audio_gain_for_power(frac: f32) -> f32 {
+    frac.clamp(0.0, 1.0).sqrt()
+}
+
 /// Spawn the serial CAT thread from a persisted [`CatConfig`].
 pub fn spawn(cfg: CatConfig) -> CatHandle {
     let cfg = with_family_serial_limits(cfg);
@@ -1749,6 +1776,7 @@ pub fn spawn(cfg: CatConfig) -> CatHandle {
     // Same reason: the engine asks whether this rig's power can be commanded
     // before it commands anything.
     let commands_power = make_protocol(&cfg).commands_power();
+    let power_by_audio = make_protocol(&cfg).power_by_audio();
     let commands_filter = make_protocol(&cfg).commands_filter();
     let commands_squelch = make_protocol(&cfg).commands_squelch();
     // And the same again for the antenna sockets: the caps this device
@@ -1809,6 +1837,7 @@ pub fn spawn(cfg: CatConfig) -> CatHandle {
         scope,
         cw_chunk_len,
         commands_power,
+        power_by_audio,
         commands_filter,
         commands_squelch,
         antennas,

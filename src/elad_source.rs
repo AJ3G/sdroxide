@@ -144,6 +144,10 @@ pub struct EladSource {
     out: Option<(sdroxide_audio::AudioOutput, sdroxide_radio::rtrb::Producer<f32>)>,
     tx_resampler: Option<sdroxide_dsp::MonoResampler>,
     tx_scratch: Vec<f32>,
+    /// Amplitude applied to the TX audio: the Drive level, or the TUNE level
+    /// while tuning. The rig's power register is pinned at MAX when the CAT
+    /// port opens (`sdroxide_cat::elad`), so this is the power control.
+    tx_audio_gain: f32,
 
     /// Mirrors of the front-end switches, so `current_gains` can answer without
     /// a round trip to the stream thread.
@@ -363,6 +367,7 @@ impl EladSource {
             out,
             tx_resampler,
             tx_scratch: Vec::new(),
+            tx_audio_gain: 1.0,
             attenuator: cfg.attenuator,
             preselector: cfg.preselector,
             antenna: EladAntenna::default(),
@@ -867,6 +872,9 @@ impl IqSource for EladSource {
 
     fn set_tx_drive(&mut self, frac: f64) {
         if let Control::Serial(cat) = &self.control {
+            if cat.power_by_audio() {
+                self.tx_audio_gain = sdroxide_cat::audio_gain_for_power(frac as f32);
+            }
             cat.set_power(frac as f32);
         }
     }
@@ -932,9 +940,10 @@ impl IqSource for EladSource {
             Some(rs) => rs.push(audio, &mut self.tx_scratch),
             None => self.tx_scratch.extend_from_slice(audio),
         }
+        let gain = self.tx_audio_gain;
         for &s in &self.tx_scratch {
             for _ in 0..2 {
-                let mut v = s;
+                let mut v = s * gain;
                 let mut tries = 0u32;
                 while let Err(sdroxide_radio::rtrb::PushError::Full(x)) = producer.push(v) {
                     v = x;
