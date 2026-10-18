@@ -57,12 +57,16 @@ const FREQ_DIGITS: usize = 11;
 /// The tenth setting, `TP09`, is "MAX": more than 5 W by an amount ELAD does
 /// not publish and which is not the same on every band. It is accepted from the
 /// radio — an operator who set MAX at the front panel should see a full slider
-/// rather than a needle that fell off the bottom — but never commanded, because
-/// there is no fraction of anything it can honestly be the answer to.
+/// rather than a needle that fell off the bottom — and it is what the top of
+/// the Drive slider commands (see [`MAX_POWER_FRAC`]).
 const TX_POWER_STEPS_W: [f32; 9] = [0.3, 0.5, 1.0, 1.2, 1.5, 2.0, 3.0, 4.0, 5.0];
 
-/// The `TP` parameter for "MAX", which is read but never written.
+/// The `TP` parameter for "MAX".
 const TX_POWER_MAX_CODE: u32 = 9;
+
+/// Drive fraction at and above which `TP09` (MAX) is sent instead of a
+/// numbered step. Just under 1.0 so float rounding at 100% still lands on MAX.
+const MAX_POWER_FRAC: f32 = 0.995;
 
 /// Watts at the top of the Drive slider. The highest step that means a number.
 const FULL_POWER_W: f32 = 5.0;
@@ -429,6 +433,13 @@ impl Protocol for Elad {
     }
 
     fn set_power(&mut self, frac: f32) -> Vec<Vec<u8>> {
+        // The top of the slider is MAX, not 5 W: Drive wide open should leave
+        // the rig's power menu on MAX. The TUNE level is commanded through here
+        // too, so anything below the top still picks a numbered step and a
+        // tune carrier stays at its own lower level.
+        if frac >= MAX_POWER_FRAC {
+            return vec![format!("TP{TX_POWER_MAX_CODE:02};").into_bytes()];
+        }
         let want = frac.clamp(0.0, 1.0) * FULL_POWER_W;
         // Nearest step rather than the next one down: the steps are coarse and
         // unevenly spaced at the bottom (0.3, 0.5, 1.0), so rounding down would
@@ -770,15 +781,19 @@ mod tests {
     #[test]
     fn power_is_nine_fixed_steps_not_watts() {
         let mut e = elad();
-        // The slider's top and bottom are the top and bottom of the step list.
-        assert_eq!(frames(e.set_power(1.0)), vec!["TP08;"]); // 5.0 W
+        // The top of the slider is MAX; the bottom is the lowest step.
+        assert_eq!(frames(e.set_power(1.0)), vec!["TP09;"]); // MAX
         assert_eq!(frames(e.set_power(0.0)), vec!["TP00;"]); // 0.3 W
         // Nearest step, not the next one down — the steps are coarse and
         // uneven at the bottom.
         assert_eq!(frames(e.set_power(0.4)), vec!["TP05;"]); // 2.0 W
         assert_eq!(frames(e.set_power(0.6)), vec!["TP06;"]); // 3.0 W
-        // Never `TP09;` — MAX is not a fraction of anything.
-        for pct in 0..=100 {
+        assert_eq!(frames(e.set_power(0.95)), vec!["TP08;"]); // 5.0 W
+        // TUNE goes through here too: a low tune level stays low.
+        assert_eq!(frames(e.set_power(0.05)), vec!["TP00;"]); // 0.3 W
+        assert_eq!(frames(e.set_power(0.2)), vec!["TP02;"]); // 1.0 W
+        // Only the very top of the slider is MAX.
+        for pct in 0..=99 {
             let f = frames(e.set_power(pct as f32 / 100.0));
             assert_ne!(f[0], "TP09;", "{pct}%");
         }
