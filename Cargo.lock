@@ -5076,6 +5076,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sdroxide-hardrock"
+version = "1.6.10"
+dependencies = [
+ "crossbeam-channel",
+ "sdroxide-types",
+ "serialport",
+ "tracing",
+]
+
+[[package]]
 name = "sdroxide-hfdl"
 version = "1.6.10"
 dependencies = [
@@ -5308,6 +5318,7 @@ dependencies = [
  "sdroxide-digi",
  "sdroxide-drm",
  "sdroxide-dsp",
+ "sdroxide-hardrock",
  "sdroxide-hfdl",
  "sdroxide-ism",
  "sdroxide-kiss",

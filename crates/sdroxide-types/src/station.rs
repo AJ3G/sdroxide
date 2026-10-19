@@ -88,4 +88,12 @@ pub struct StationConfig {
     ///
     /// Appended last, for the usual reason.
     pub digi_presets: Vec<crate::DigiPreset>,
+    /// The Hardrock amplifier: which one, which port, and whether it follows
+    /// the band — `amp.json` on the engine's machine.
+    ///
+    /// Station-wide for the T/R switch's reason: one amplifier sits behind
+    /// whatever this program is transmitting with.
+    ///
+    /// Appended last, for the usual reason.
+    pub amp: crate::AmpConfig,
 }

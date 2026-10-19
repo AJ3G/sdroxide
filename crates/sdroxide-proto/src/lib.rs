@@ -1546,7 +1546,12 @@ use sdroxide_types::{
 /// ([`sdroxide_types::RotatorProtocol`], a unit enum) on its tail — rotctld or
 /// PSTRotator's UDP control (issue #638). It rides `Command::SetRotatorConfig`
 /// and `StationConfig::rotator` whole, so a v178 peer reads it out of step.
-pub const PROTO_VERSION: u16 = 179;
+///
+/// v180: the Hardrock amplifier. `Command` gains `SetAmpConfig` and `Amp`,
+/// `ServerMsg` gains `AmpStatus`, and `StationConfig` gains `amp` on its tail.
+///
+/// v181: `AmpAlerts` gains `from_amp`, for the amplifier's own lights.
+pub const PROTO_VERSION: u16 = 181;
 const VERSION_BYTE: u8 = 0x12;
 
 #[derive(Debug, thiserror::Error)]
@@ -2005,6 +2010,11 @@ pub enum ServerMsg {
     ///
     /// Appended last, for the usual reason.
     Pi4Spots(Vec<sdroxide_types::Pi4Spot>),
+    /// `RadioEvent::AmpStatus`: the Hardrock amplifier's readings, tuner and
+    /// link state. Replayed on connect for the T/R switch's reason.
+    ///
+    /// Appended last, for the usual reason.
+    AmpStatus(Box<sdroxide_types::AmpStatus>),
 }
 
 /// One radio in a station's roster, as a client sees it.
