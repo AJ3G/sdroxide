@@ -36,6 +36,7 @@ pub(in crate::app) mod net;
 pub(in crate::app) mod palette;
 pub(in crate::app) mod panels;
 pub(crate) mod persist;
+pub(in crate::app) mod playback;
 pub(in crate::app) mod publicsdr;
 pub(in crate::app) mod qo100;
 pub(in crate::app) mod rds;
@@ -44,6 +45,8 @@ pub(in crate::app) mod save_text;
 pub(in crate::app) mod scanner;
 pub(in crate::app) mod settings;
 pub(in crate::app) mod solar;
+pub(in crate::app) mod sonde;
+pub(in crate::app) mod sonde_card;
 pub(in crate::app) mod spectrum;
 pub(in crate::app) mod speech;
 pub(in crate::app) mod spots;
@@ -51,9 +54,12 @@ pub(in crate::app) mod top_bar;
 pub(in crate::app) mod tx_audio;
 pub(in crate::app) mod undocked;
 pub(crate) mod util;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod window_fit_tests;
 pub(in crate::app) mod windows;
 pub(in crate::app) mod winlink;
 pub(in crate::app) mod workplaces;
+pub(in crate::app) mod wxsat;
 
 use crate::i18n::tr;
 use std::sync::{Arc, Mutex};
@@ -894,6 +900,14 @@ pub struct SdroxideApp {
     daylight_at: f64,
     /// The BANDS window.
     show_bands: bool,
+    /// The PLAYBACK window's state — see [`playback::PlaybackUi`].
+    pub(in crate::app) playback: playback::PlaybackUi,
+    /// The WEATHER SATELLITES window and the picture it shows — see
+    /// [`wxsat::WxsatUi`].
+    wxsat: wxsat::WxsatUi,
+    /// The RADIOSONDES window, its map and the SondeHub layer — see
+    /// [`sonde::SondeUi`].
+    sonde: sonde::SondeUi,
     /// The propagation field rendered to pixels, rebuilt only when it moves.
     prop_heat: crate::prop_map::PropHeat,
     /// The grey-line (night/twilight) overlay rendered to pixels, rebuilt at
@@ -1757,6 +1771,9 @@ impl SdroxideApp {
             daylight: true,
             daylight_at: f64::NEG_INFINITY,
             show_bands: false,
+            playback: playback::PlaybackUi::default(),
+            wxsat: wxsat::WxsatUi::default(),
+            sonde: sonde::SondeUi::default(),
             digi_stations: Default::default(),
             prop: Default::default(),
             prop_heat: Default::default(),
