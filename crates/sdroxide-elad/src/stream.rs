@@ -101,11 +101,7 @@ pub(crate) fn spawn(cfg: &EladConfig, center_hz: f64) -> Result<EladHandle> {
     let t = Trace::new();
     trace::remember(&t);
 
-    // Sized for the rate the stream will really be read at: a DUO already
-    // measured in another mode is read at that one (see `handle::duo_rate_for`).
-    let ring_rate =
-        crate::handle::duo_rate_for(cfg.sample_rate_hz).unwrap_or(0).max(cfg.sample_rate_hz);
-    let (rx_prod, rx_cons) = ring_for(ring_rate as f64);
+    let (rx_prod, rx_cons) = ring_for(cfg.sample_rate_hz as f64);
 
     let cfg = cfg.clone();
     let thread_shared = Arc::clone(&shared);
@@ -178,7 +174,7 @@ fn run(
         tracing::warn!("ELAD stream stopped: {e}");
         trace.note(format!("stream stopped: {e}"));
     }
-    dev.shutdown();
+    dev.shutdown(shared.leaving.load(Ordering::Relaxed));
 }
 
 fn pump(
@@ -259,7 +255,13 @@ fn pump(
         //     only its own front panel can make the answer differ from what we
         //     last commanded.
         let tune_poll_every = TUNE_POLL * (1 << tune_poll_failures.min(TUNE_POLL_BACKOFF_MAX));
-        if shared.read_dial.load(Ordering::Relaxed) && last_tune_poll.elapsed() >= tune_poll_every {
+        // Not on a DUO running a wide image: its read-back then reports VFO B,
+        // while the I/Q centre is the one this driver set, and following it
+        // walked the centre between the two (AJ3G, 25 Oct 2026).
+        if shared.read_dial.load(Ordering::Relaxed)
+            && !dev.remote()
+            && last_tune_poll.elapsed() >= tune_poll_every
+        {
             last_tune_poll = Instant::now();
             match dev.read_tuned() {
                 Ok(Some(t)) => {
@@ -387,20 +389,17 @@ fn pump(
         // The rate is a guess until the stream has been running long enough to
         // measure. See `RxStats::check_rate`.
         if let Some(mut w) = stats.check_rate(trace) {
-            // A DUO's mode is not something this driver can set, but it can be
-            // read at the mode it is in. When the throughput names exactly one
-            // rate, remember it and ask for a reopen, which reads the stream at
-            // that rate; the operator is told, so they can save it.
+            // A DUO read at 192 kHz but streaming at another rate was left on a
+            // wide image, most likely by another program. Putting it back on its
+            // own image is something this driver can do, once: ask for a reopen,
+            // and the reopen restores stand-alone (see `remote::ask_restore`).
             if dev.model() == Model::Duo
-                && let Some(r) = stats.detected_rate()
+                && dev.rate_hz() == crate::remote::STANDALONE_RATE_HZ
+                && crate::remote::ask_restore()
             {
-                crate::handle::remember_duo_rate(dev.configured_rate_hz(), r);
-                shared.rate_adopted.store(true, Ordering::Relaxed);
-                w = format!(
-                    "{w} sdroxide is switching to {:.0} kHz for this session.",
-                    r as f64 / 1000.0
-                );
-                trace.note(format!("adopting measured rate {r} Hz"));
+                shared.reopen_wanted.store(true, Ordering::Relaxed);
+                w = format!("{w} sdroxide is putting the FDM-DUO back in stand-alone at 192 kHz.");
+                trace.note("asking for a reopen to restore stand-alone");
             }
             tracing::warn!("{w}");
             *late_warning.lock().unwrap_or_else(|e| e.into_inner()) = Some(w);
