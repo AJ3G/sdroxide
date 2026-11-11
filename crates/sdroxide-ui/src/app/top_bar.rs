@@ -2430,6 +2430,7 @@ impl SdroxideApp {
             ui,
             self.rx_gain().is_some(),
             self.decim_range().is_some(),
+            self.elad_bw_applies(),
             self.state.rx[0].agc == AgcMode::Off,
             self.state.rx[0].mode,
         )
@@ -2549,6 +2550,51 @@ impl SdroxideApp {
         }
     }
 
+    /// Whether the radio is an ELAD, whose stream rate — the width of the
+    /// whole panadapter — has a chip of its own beside DEC.
+    fn elad_bw_applies(&self) -> bool {
+        self.caps.as_ref().is_some_and(|c| c.driver == "elad")
+    }
+
+    /// The ELAD's bandwidth: which of its six stream rates sdroxide reads it at.
+    ///
+    /// The same setting as Settings → Radio → Sample rate, put where it can be
+    /// reached without opening Settings, because on an FDM-DUO it has to
+    /// follow whatever mode the radio was last left in (by ELAD's own software,
+    /// for one). Cycling, like DEC beside it and for the same reason: a combo
+    /// inside the RX menu closes the menu. Click goes one rate wider,
+    /// right-click one narrower; either saves the setting and reopens the
+    /// radio, which is what Apply in Settings does for it.
+    fn elad_bw_chip(&mut self, ui: &mut egui::Ui, cmds: &mut Vec<Command>) {
+        use sdroxide_types::ELAD_SAMPLE_RATES;
+        if !self.elad_bw_applies() {
+            return;
+        }
+        if self.radio_cfg.is_none() {
+            self.radio_cfg = self.ctrl.radio_config();
+        }
+        let Some(now) = self.radio_cfg.as_ref().map(|r| r.elad.sample_rate_hz) else { return };
+        let label = format!("B/W {}k", now / 1000);
+        let hint = tr!("topbar-elad-bw-hint", khz = (now / 1000).to_string());
+        let resp = crate::chrome::chip(ui, false, label).on_hover_text(hint);
+        let at = ELAD_SAMPLE_RATES.iter().position(|&r| r == now);
+        let n = ELAD_SAMPLE_RATES.len();
+        let next = if resp.clicked() {
+            Some(ELAD_SAMPLE_RATES[at.map_or(0, |i| (i + 1) % n)])
+        } else if resp.secondary_clicked() {
+            Some(ELAD_SAMPLE_RATES[at.map_or(0, |i| (i + n - 1) % n)])
+        } else {
+            None
+        };
+        if let Some(rate) = next
+            && rate != now
+            && let Some(cfg) = self.radio_cfg.as_mut()
+        {
+            cfg.elad.sample_rate_hz = rate;
+            cmds.push(Command::SetRadioConfig { cfg: Box::new(cfg.clone()), reopen: true });
+        }
+    }
+
     /// The receiver and filter/noise controls — the body of the RX box, and of
     /// the RX menu. See [`crate::chrome::control_row`] for `narrow`.
     ///
@@ -2645,6 +2691,7 @@ impl SdroxideApp {
                 }
             }
             self.decim_chip(ui, cmds);
+            self.elad_bw_chip(ui, cmds);
             // A cycling chip rather than a combo: a combo inside a menu
             // opens a second popup layer, and clicking it counts as
             // "outside" and closes the menu it was opened from. Four
@@ -6686,7 +6733,14 @@ impl RxRows {
 /// whose receive row is already full lifts nothing and is laid out exactly as
 /// before; a bare one comes out a third narrower, which is often the
 /// difference between the strip packing into two rows and taking a third.
-fn rx_rows(ui: &egui::Ui, gain: bool, decim: bool, agc_off: bool, mode: Mode) -> RxRows {
+fn rx_rows(
+    ui: &egui::Ui,
+    gain: bool,
+    decim: bool,
+    elad_bw: bool,
+    agc_off: bool,
+    mode: Mode,
+) -> RxRows {
     let g = MODULE_ROW_SPACING;
     // The Vol and SQL rails, which is what the box's stretch lengthens — so
     // they are priced at the floor they fall back to, not the style width.
@@ -6706,6 +6760,10 @@ fn rx_rows(ui: &egui::Ui, gain: bool, decim: bool, agc_off: bool, mode: Mode) ->
         // width whatever it is set to — it either rides this row or, on a
         // radio with no span to spare, is not drawn at all.
         receive += g + chip(&tr!("topbar-dec-off")).max(chip("DEC /64"));
+    }
+    if elad_bw {
+        // Priced at its widest label, for the same reason as DEC's.
+        receive += g + chip("B/W 6144k");
     }
     // At the widest of the four settings, so the box does not change width —
     // and the strip does not re-break its rows — as the AGC is cycled. In FM
@@ -8598,8 +8656,9 @@ mod tests {
         let vfo = chip_row_w(ui, &vfo_chip_labels(true)).max(vfo_offsets_w(ui, true))
             + 2.0 * crate::chrome::MODULE_MARGIN_X
             + 4.0;
-        let rx =
-            rx_rows(ui, false, false, false, mode).w() + 2.0 * crate::chrome::MODULE_MARGIN_X + 4.0;
+        let rx = rx_rows(ui, false, false, false, false, mode).w()
+            + 2.0 * crate::chrome::MODULE_MARGIN_X
+            + 4.0;
         // A CAT rig modulates our audio, so a digital mode there draws the
         // transmit-audio rail rather than the mic one — and it is the wider of
         // the two. It is also why no CESSB rail joins them: the envelope is
@@ -8755,7 +8814,7 @@ mod tests {
         ctx.run_ui(input, |ui| {
             let mut boxes = cat_rig_strip_boxes(ui, Mode::Lsb);
             // The receive box an SDR draws, in place of the CAT rig's.
-            let rx = rx_rows(ui, true, true, true, Mode::Lsb).w()
+            let rx = rx_rows(ui, true, true, false, true, Mode::Lsb).w()
                 + 2.0 * crate::chrome::MODULE_MARGIN_X
                 + 4.0;
             boxes[3] = StripBox { w: rx, flex: 2.0, max_w: rx + RAIL_STRETCH_MAX };
@@ -9235,7 +9294,7 @@ mod tests {
                             // reserved for them, so the rows are laid out here
                             // at the same figure.
                             ui.spacing_mut().slider_width = STRIP_RAIL_W;
-                            let rows = rx_rows(ui, gain, decim, agc_off, mode);
+                            let rows = rx_rows(ui, gain, decim, false, agc_off, mode);
                             let chips = rx_chips(mode);
                             let (mut vol, mut db) = (0.5f32, -88.8f32);
                             // The deepest threshold, which is the longest the

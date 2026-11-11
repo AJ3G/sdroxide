@@ -101,7 +101,11 @@ pub(crate) fn spawn(cfg: &EladConfig, center_hz: f64) -> Result<EladHandle> {
     let t = Trace::new();
     trace::remember(&t);
 
-    let (rx_prod, rx_cons) = ring_for(cfg.sample_rate_hz as f64);
+    // Sized for the rate the stream will really be read at: a DUO already
+    // measured in another mode is read at that one (see `handle::duo_rate_for`).
+    let ring_rate =
+        crate::handle::duo_rate_for(cfg.sample_rate_hz).unwrap_or(0).max(cfg.sample_rate_hz);
+    let (rx_prod, rx_cons) = ring_for(ring_rate as f64);
 
     let cfg = cfg.clone();
     let thread_shared = Arc::clone(&shared);
@@ -382,7 +386,22 @@ fn pump(
 
         // The rate is a guess until the stream has been running long enough to
         // measure. See `RxStats::check_rate`.
-        if let Some(w) = stats.check_rate(trace) {
+        if let Some(mut w) = stats.check_rate(trace) {
+            // A DUO's mode is not something this driver can set, but it can be
+            // read at the mode it is in. When the throughput names exactly one
+            // rate, remember it and ask for a reopen, which reads the stream at
+            // that rate; the operator is told, so they can save it.
+            if dev.model() == Model::Duo
+                && let Some(r) = stats.detected_rate()
+            {
+                crate::handle::remember_duo_rate(dev.configured_rate_hz(), r);
+                shared.rate_adopted.store(true, Ordering::Relaxed);
+                w = format!(
+                    "{w} sdroxide is switching to {:.0} kHz for this session.",
+                    r as f64 / 1000.0
+                );
+                trace.note(format!("adopting measured rate {r} Hz"));
+            }
             tracing::warn!("{w}");
             *late_warning.lock().unwrap_or_else(|e| e.into_inner()) = Some(w);
         }

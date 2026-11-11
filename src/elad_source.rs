@@ -1026,7 +1026,9 @@ impl IqSource for EladSource {
     /// as needing a reopen so the engine reconnects on its own — which is what
     /// makes replugging one Just Work rather than needing Apply pressed.
     fn needs_reopen(&self) -> bool {
-        !self.handle.is_alive() || self.handle.silent_for() >= SILENCE_BEFORE_REOPEN
+        !self.handle.is_alive()
+            || self.handle.silent_for() >= SILENCE_BEFORE_REOPEN
+            || self.handle.wants_reopen_at_measured_rate()
     }
 
     /// Hand the device back before the engine opens its replacement. Without
