@@ -38,6 +38,9 @@ pub struct Device {
     cal: Calibration,
     center_hz: f64,
     rate_hz: u32,
+    /// The rate the configuration asked for. Differs from `rate_hz` only on a
+    /// DUO already measured in another mode — see `handle::duo_rate_for`.
+    configured_rate_hz: u32,
     attenuator: bool,
     preselector: bool,
     /// Serial and hardware version out of the EEPROM, for the log and the UI.
@@ -84,12 +87,22 @@ impl Device {
         }
         let model = usb.model();
 
+        // A DUO cannot be told its rate, only read at it. If this setting has
+        // already been measured to be in another mode, read it at that mode.
+        let measured = if model == Model::Duo {
+            crate::handle::duo_rate_for(cfg.sample_rate_hz)
+        } else {
+            None
+        };
+        let rate_hz = measured.unwrap_or(cfg.sample_rate_hz);
+
         let mut dev = Device {
             usb,
             model,
             cal: Calibration::default(),
             center_hz,
-            rate_hz: cfg.sample_rate_hz,
+            rate_hz,
+            configured_rate_hz: cfg.sample_rate_hz,
             attenuator: cfg.attenuator,
             preselector: cfg.preselector,
             serial: None,
@@ -105,6 +118,18 @@ impl Device {
 
         if let Some(w) = fpga_warning {
             tracing::warn!("{w}");
+            dev.trace.note(&w);
+            dev.warnings.push(w);
+        }
+
+        if measured.is_some() && rate_hz != cfg.sample_rate_hz {
+            let w = format!(
+                "the FDM-DUO was measured in its {:.0} kHz mode, so it is being read at that \
+                 rate rather than the {:.0} kHz set in Settings → Radio. Set it there to keep it.",
+                rate_hz as f64 / 1000.0,
+                cfg.sample_rate_hz as f64 / 1000.0,
+            );
+            tracing::info!("{w}");
             dev.trace.note(&w);
             dev.warnings.push(w);
         }
@@ -438,6 +463,12 @@ impl Device {
 
     pub fn rate_hz(&self) -> u32 {
         self.rate_hz
+    }
+
+    /// The rate the configuration asked for, which a DUO's measured mode may
+    /// have overridden.
+    pub fn configured_rate_hz(&self) -> u32 {
+        self.configured_rate_hz
     }
 
     pub fn center_hz(&self) -> f64 {

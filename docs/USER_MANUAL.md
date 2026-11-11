@@ -11557,11 +11557,21 @@ FDM-S2 this setting therefore *is* a command: it chooses the image loaded above.
 menu for the rate, so it arrives at whatever it powered up in — 192 kHz on a
 fresh one — or whatever FDM-SW2 last left it in, and this setting says which one
 that is. Set it wrong and you still get samples: the panadapter is simply the
-wrong width, with every frequency inside it scaled to match. sdroxide measures
-the real throughput a couple of seconds after the stream starts and tells you on
-screen when the two disagree, naming the rate to pick. The one exception is
-6144 kHz, where the samples themselves are half as wide — a wrong guess there is
-noise rather than a mis-scaled spectrum.
+wrong width, with every frequency inside it scaled to match, and the digital
+modes decode nothing. sdroxide measures the real throughput a couple of seconds
+after the stream starts. When it fits exactly one rate other than the one set,
+sdroxide reopens the radio at that rate for the rest of the session and says so
+on screen; set it here (or with the **B/W** chip) to keep it. The exception is
+6144 kHz, where the samples themselves are half as wide: 3072 and 6144 kHz put
+the same number of bytes on the wire, so throughput cannot tell them apart.
+sdroxide names both and leaves the choice to you; the wrong one of the two shows
+only noise.
+
+**The B/W chip.** With an ELAD connected, the RX box carries a **B/W** chip
+beside **DEC**, showing the rate the stream is read at (*B/W 192k*). Click it
+for the next wider rate and right-click for the next narrower. Either saves the
+setting and reopens the radio, exactly as changing **Sample rate** here and
+pressing Apply does.
 
 **Attenuator and pre-selection filters.** The pad is the same control as the main
 window's Gain slider. The filters are the low-pass bank in front of the ADC:

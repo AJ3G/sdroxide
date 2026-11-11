@@ -2079,6 +2079,7 @@ topbar-hide-band-chip-brings-back = Hide — the band chip brings it back
 topbar-undock = UNDOCK
 topbar-return-selector-top-bar-popup = Return the selector to the top-bar popup
 topbar-dec-off = DEC off
+topbar-elad-bw-hint = ELAD bandwidth: the stream is read at { $khz } kHz, the width of the whole panadapter. Click for the next wider rate, right-click for the next narrower; either saves it and reopens the radio, like Sample rate in Settings → Radio. An FDM-DUO stays in the mode it was last left in, so if the stream turns out to be in another one sdroxide measures it and follows it for the session.
 topbar-vol = Vol
 topbar-counted-steps-not-decibels-what =
     {""}
