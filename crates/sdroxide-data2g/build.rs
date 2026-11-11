@@ -73,6 +73,11 @@ fn main() {
         || build.join("data2g_zlib.lib").exists();
     if fetched_zlib {
         println!("cargo:rustc-link-lib=static=data2g_zlib");
+    } else if windows {
+        // MSYS2's zlib, found by CMake on the windows-gnu build. Linked
+        // statically: the dynamic one is libz-1.dll, which the installer does
+        // not ship, so sdroxide.exe would not start.
+        println!("cargo:rustc-link-lib=static=z");
     } else {
         println!("cargo:rustc-link-lib=dylib=z");
     }
