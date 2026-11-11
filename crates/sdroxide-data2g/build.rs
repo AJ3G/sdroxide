@@ -46,7 +46,15 @@ fn main() {
     copy_tree(&vendor, &src);
     relax_cmake_minimum(&vendor.join("CMakeLists.txt"), &src.join("CMakeLists.txt"));
 
-    let dst = cmake::Config::new(&src)
+    let mut cfg = cmake::Config::new(&src);
+    // On Windows, use Data2G's own pinned, static zlib even where CMake could
+    // find one: on the windows-gnu build it finds MSYS2's, whose import
+    // library makes sdroxide.exe need libz-1.dll, which the installer does
+    // not ship ("libz-1.dll was not found" at start-up).
+    if windows {
+        cfg.define("CMAKE_DISABLE_FIND_PACKAGE_ZLIB", "ON");
+    }
+    let dst = cfg
         .out_dir(&cmake_out)
         .define("DATA2G_BUILD_PYMODULE", "OFF")
         .define("DATA2G_BUILD_TESTS", "OFF")
@@ -73,11 +81,6 @@ fn main() {
         || build.join("data2g_zlib.lib").exists();
     if fetched_zlib {
         println!("cargo:rustc-link-lib=static=data2g_zlib");
-    } else if windows {
-        // MSYS2's zlib, found by CMake on the windows-gnu build. Linked
-        // statically: the dynamic one is libz-1.dll, which the installer does
-        // not ship, so sdroxide.exe would not start.
-        println!("cargo:rustc-link-lib=static=z");
     } else {
         println!("cargo:rustc-link-lib=dylib=z");
     }
