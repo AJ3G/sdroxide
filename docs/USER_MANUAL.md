@@ -11885,8 +11885,8 @@ If another program left the DUO on a wide image and this setting says 192 kHz,
 sdroxide notices from the stream's throughput a couple of seconds after it
 starts, puts the radio back in stand-alone and reopens it, once per session.
 
-**The B/W chip.** With an ELAD connected, the RX box carries a **B/W** chip
-beside **DEC**, showing the rate the radio is streaming (*B/W 192k*). It is
+**The SPAN chip.** With an ELAD connected, the RX box carries a **SPAN** chip
+beside **DEC**, showing the rate the radio is streaming (*SPAN 192k*). It is
 shown only when the radio is an ELAD. Click it for the next wider rate and
 right-click for the next narrower. Either saves the setting and reopens the
 radio, exactly as changing **Sample rate** here and pressing Apply does; on an

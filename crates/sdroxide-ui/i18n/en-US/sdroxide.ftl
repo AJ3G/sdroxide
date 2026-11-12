@@ -2079,7 +2079,7 @@ topbar-hide-band-chip-brings-back = Hide — the band chip brings it back
 topbar-undock = UNDOCK
 topbar-return-selector-top-bar-popup = Return the selector to the top-bar popup
 topbar-dec-off = DEC off
-topbar-elad-bw-hint = ELAD bandwidth: the radio streams { $khz } kHz, the width of the whole panadapter. Click for the next wider rate, right-click for the next narrower; either saves it and reopens the radio, like Sample rate in Settings → Radio. On an FDM-DUO every rate above 192 kHz loads ELAD's wide image (about 7 s, from the driver FDM-SW2 or SDR Console installs), and 192 kHz puts the radio back in stand-alone.
+topbar-elad-bw-hint = ELAD span (not the BW receive filter): the radio streams { $khz } kHz, the width of the whole panadapter. Click for the next wider rate, right-click for the next narrower; either saves it and reopens the radio, like Sample rate in Settings → Radio. On an FDM-DUO every rate above 192 kHz loads ELAD's wide image (about 7 s, from the driver FDM-SW2 or SDR Console installs), and 192 kHz puts the radio back in stand-alone.
 topbar-vol = Vol
 topbar-counted-steps-not-decibels-what =
     {""}
