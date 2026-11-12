@@ -1289,7 +1289,11 @@ fn make_protocol(cfg: &CatConfig) -> Box<dyn Protocol> {
         CatFamily::Yaesu => Box::new(yaesu::Yaesu::new()),
         CatFamily::Kenwood => Box::new(kenwood::Kenwood::new(cfg.kenwood_send)),
         CatFamily::Elecraft => Box::new(elecraft::Elecraft::new()),
-        CatFamily::Elad => Box::new(elad::Elad::new(cfg.elad_tx_input, cfg.elad_tx_power)),
+        CatFamily::Elad => Box::new(elad::Elad::new(
+            cfg.elad_tx_input,
+            cfg.elad_tx_power,
+            cfg.elad_mute_on_radio_ptt,
+        )),
         // The one family whose framing depends on the *sound* settings: a QMX's
         // USB codec carries either demodulated audio or raw I/Q, and which one
         // it must carry is asserted at the radio when the port opens.
