@@ -2574,7 +2574,7 @@ impl SdroxideApp {
             self.radio_cfg = self.ctrl.radio_config();
         }
         let Some(now) = self.radio_cfg.as_ref().map(|r| r.elad.sample_rate_hz) else { return };
-        let label = format!("B/W {}k", now / 1000);
+        let label = format!("SPAN {}k", now / 1000);
         let hint = tr!("topbar-elad-bw-hint", khz = (now / 1000).to_string());
         let resp = crate::chrome::chip(ui, false, label).on_hover_text(hint);
         let at = ELAD_SAMPLE_RATES.iter().position(|&r| r == now);
@@ -6763,7 +6763,7 @@ fn rx_rows(
     }
     if elad_bw {
         // Priced at its widest label, for the same reason as DEC's.
-        receive += g + chip("B/W 6144k");
+        receive += g + chip("SPAN 6144k");
     }
     // At the widest of the four settings, so the box does not change width —
     // and the strip does not re-break its rows — as the AGC is cycled. In FM
