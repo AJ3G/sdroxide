@@ -2567,6 +2567,11 @@ impl RtlSdrConfig {
     /// without depending on the native backend crate — same reason as
     /// [`HpsdrConfig::LNA_GAIN_ELEMENT`].
     pub const TUNER_GAIN_ELEMENT: &'static str = "TUNER";
+    /// The R82xx's three stages one by one — LNA, mixer, and the IF VGA —
+    /// each on its own 16-step ladder, beside the combined `TUNER` ladder
+    /// that walks LNA and mixer together.
+    pub const LNA_GAIN_ELEMENT: &'static str = "LNA";
+    pub const MIX_GAIN_ELEMENT: &'static str = "MIX";
     pub const IF_GAIN_ELEMENT: &'static str = "IF";
     /// Pseudo-elements carrying settings that are not gains at all.
     ///
@@ -3267,6 +3272,8 @@ impl Rx888Config {
     /// `sdroxide-rx888` so the wasm-safe settings UI can address them without
     /// depending on the native backend crate.
     pub const VGA_ELEMENT: &'static str = "VGA";
+    /// The AD8370's gain range: 0 either (the driver's pick), 1 low, 2 high.
+    pub const VGA_RANGE_ELEMENT: &'static str = "VGARANGE";
     pub const ATT_ELEMENT: &'static str = "ATT";
     pub const DITHER_ELEMENT: &'static str = "DITHER";
     pub const BIAS_TEE_ELEMENT: &'static str = "BIASTEE";

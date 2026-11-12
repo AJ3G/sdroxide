@@ -23,6 +23,7 @@ pub(in crate::app) mod alerts;
 mod amp;
 pub(in crate::app) mod awards;
 pub(in crate::app) mod bands;
+pub(in crate::app) mod checkup;
 pub(in crate::app) mod drm;
 mod duo_power;
 pub(in crate::app) mod frame;
@@ -31,6 +32,7 @@ pub(in crate::app) mod hd;
 pub(in crate::app) mod hfdl;
 pub(in crate::app) mod ism;
 pub(in crate::app) mod logbook;
+pub(in crate::app) mod mean;
 pub(in crate::app) mod morse;
 pub(in crate::app) mod net;
 pub(in crate::app) mod palette;
@@ -54,6 +56,7 @@ pub(in crate::app) mod top_bar;
 pub(in crate::app) mod tx_audio;
 pub(in crate::app) mod undocked;
 pub(crate) mod util;
+pub(in crate::app) mod welcome;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod window_fit_tests;
 pub(in crate::app) mod windows;
@@ -136,10 +139,28 @@ pub struct SdroxideApp {
     /// Latest spectrum frame, shared with the GPU waterfall callback — the Arc
     /// makes the per-repaint handoff a refcount bump instead of a bins clone.
     frame: Option<std::sync::Arc<SpectrumFrame>>,
+    /// The S/N guide's accumulated mean, while it is on.
+    snr_grid: Option<crate::mean_spectrum::MeanGrid>,
+    /// The S/N guide as last computed, for the spectrum widget.
+    snr_last: Option<std::sync::Arc<crate::mean_spectrum::Guide>>,
+    /// LABELS BY S/N: each spot's label decision and fade, see
+    /// [`crate::app::spectrum::SnrLabels`].
+    snr_labels: std::cell::RefCell<crate::app::spectrum::SnrLabels>,
+    /// The catalogues LABELS BY S/N offers beyond the broadcast list, read
+    /// once when it first needs them: the whole EiBi schedule, and Aoki's
+    /// list (`Err` says why there is none: not imported, unreadable).
+    catalog_schedule: Option<std::sync::Arc<Vec<sdroxide_types::BroadcastStation>>>,
+    catalog_aoki: Option<Result<std::sync::Arc<Vec<crate::catalogs::AokiEntry>>, String>>,
+    /// [`crate::catalogs::imports`] when Aoki's list was last read.
+    catalog_imports: u64,
     /// Latest full-band frame, from a direct-sampling front end that can see far
     /// more than the IQ it delivers. `None` on every other backend, which is
     /// also how the UI decides whether to offer the strip at all.
     wide_frame: Option<std::sync::Arc<SpectrumFrame>>,
+    /// The S/N and SK means over the full-band strip, kept while either line
+    /// is on (see `wide_guide_note_frame`).
+    wide_grid: Option<crate::mean_spectrum::MeanGrid>,
+    wide_guide: Option<std::sync::Arc<crate::mean_spectrum::Guide>>,
     /// Scrolling history behind the full-band strip.
     wide_wf: crate::widgets::wide_spectrum::WideWaterfall,
     meters: Option<Meters>,
@@ -321,6 +342,11 @@ pub struct SdroxideApp {
     /// second tab holding the setting from before the change does not switch
     /// the whole window back.
     applied_language: sdroxide_types::UiLanguage,
+    /// The waterfall interpolation this tab last agreed with the other tabs
+    /// on (`theme::waterfall_smooth`). A copy that differs from it was changed
+    /// here, by the UI tab or the FFT popup; a shared value that differs was
+    /// changed in another tab.
+    applied_smooth: bool,
     /// Spoken announcements: the state machine that decides what to say, and
     /// the synthesizer that says it. Always present — switched off, it holds a
     /// null sink and costs a comparison per event.
@@ -681,6 +707,10 @@ pub struct SdroxideApp {
     log_view: crate::app::logbook::LogView,
     /// The command palette (Ctrl+K). See [`palette`].
     palette: crate::app::palette::Palette,
+    /// The station check window is open. See [`checkup`].
+    show_check: bool,
+    /// The welcome walkthrough. See [`welcome`].
+    welcome: crate::app::welcome::Welcome,
     /// QSOs worked since this run started, which is what the FT8 panel's
     /// "Session" readout counts. Deliberately not derived from the logbook: the
     /// log is persisted and grows for ever, so counting it would report every
@@ -957,6 +987,15 @@ pub struct SdroxideApp {
     show_spots: bool,
     /// Show only spots that fall inside the current panadapter view span.
     spot_in_view_only: bool,
+    /// The SPOTS window's map: its view, and the spot it marks — picked in
+    /// the list or by its label on the waterfall.
+    spots_map_view: crate::widgets::worldmap::MapView,
+    spots_map_pick: Vec<Spot>,
+    /// The SPOTS map's placed spots, kept while the shown list is unchanged.
+    spots_map_cache: spots::SpotsMapCache,
+    /// The next LIST frame scrolls the first pick into view: set by a pick
+    /// on the map or the waterfall, cleared once the list has shown it.
+    spots_list_focus: bool,
     /// Fuzzy search query for the spot list. Narrows the list in the SPOTS
     /// window only — the waterfall labels are positioned by frequency, so
     /// reordering them by match quality would mean nothing.
@@ -1463,6 +1502,7 @@ impl SdroxideApp {
         crate::theme::set_spot_colors(&ui_settings.spot_colors);
         crate::theme::set_bandplan_colors(&ui_settings.bandplan_colors);
         crate::theme::set_map_cities(ui_settings.map_cities);
+        crate::theme::set_waterfall_smooth(ui_settings.waterfall_smooth);
         crate::theme::set_ui_zoom(ui_settings.ui_zoom);
         crate::i18n::set_language(ui_settings.language);
         crate::theme::apply(egui_ctx);
@@ -1504,7 +1544,15 @@ impl SdroxideApp {
             caps: None,
             state: RadioState::default(),
             frame: None,
+            snr_grid: None,
+            snr_last: None,
+            snr_labels: Default::default(),
+            catalog_schedule: None,
+            catalog_aoki: None,
+            catalog_imports: 0,
             wide_frame: None,
+            wide_grid: None,
+            wide_guide: None,
             wide_wf: Default::default(),
             meters: None,
             last_swr: None,
@@ -1558,6 +1606,7 @@ impl SdroxideApp {
             applied_look: (ui_settings.theme, ui_settings.button_style, ui_settings.window_style),
             applied_ui_font: ui_settings.menu_font_size,
             applied_language: ui_settings.language,
+            applied_smooth: ui_settings.waterfall_smooth,
             speech: speech::SpeechRuntime::new(load_speech_settings(storage)),
             speech_voices: Vec::new(),
             alerts: alerts::AlertRuntime::station(load_alerts_settings(storage)),
@@ -1698,6 +1747,8 @@ impl SdroxideApp {
             qso_log: load_qso_log(storage),
             log_view: Default::default(),
             palette: Default::default(),
+            show_check: false,
+            welcome: Default::default(),
             session_qsos: 0,
             show_digi_settings: false,
             digi_cfg_edit: sdroxide_types::DigiConfig::default(),
@@ -1793,6 +1844,10 @@ impl SdroxideApp {
             adopted_spots_gen: None,
             show_spots: false,
             spot_in_view_only: false,
+            spots_map_view: Default::default(),
+            spots_map_pick: Vec::new(),
+            spots_map_cache: Default::default(),
+            spots_list_focus: false,
             spot_search: String::new(),
             broadcast: load_broadcast_stations(),
             broadcast_spots: Vec::new(),
@@ -2260,6 +2315,8 @@ impl SdroxideApp {
         self.cert_hold = false;
         self.frame = None;
         self.wide_frame = None;
+        self.wide_grid = None;
+        self.wide_guide = None;
         // The new session starts on the engine's own spectrum config, not the
         // one the old session was told. Forgetting what was sent is what makes
         // this frame's debounce push it again.

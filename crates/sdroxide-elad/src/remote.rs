@@ -29,9 +29,11 @@
 //! CAT IQ1; about every eight seconds while streaming, IQ0; on the way out
 //! ```
 //!
-//! Ported from AJ3G's Hardrock Panel (`crates/elad-iq/src/remote.rs`), whose
-//! ELAD driver is itself a port of this crate, where it was worked out and run
-//! on an FDM-DUO at every rate. One difference from SDR Console is kept from
+//! Ported from AJ3G's custom ELAD control and signal analysis software
+//! (`crates/elad-iq/src/remote.rs`), whose ELAD driver is itself a port of
+//! this crate, and where the sequence was worked out from USB captures of
+//! SDR Console and FDM-SW2 and run on an FDM-DUO at every rate. One
+//! difference from SDR Console is kept from
 //! there: `IQ1;` (the DUO's I/Q *transmit* mode, CAT manual v2.13 p51) is never
 //! sent. Stopping and re-initialising the FIFO after the load is what makes a
 //! wide image stream, and `IQ0;` is sent after every load and on close.

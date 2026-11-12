@@ -15,6 +15,7 @@ mod aprs_map;
 /// The world the flat maps are drawn from — the globe's own land raster,
 /// sampled on the CPU, plus the border and river geometry and the city table.
 mod basemap;
+mod catalogs;
 pub mod chrome;
 mod colormap;
 mod digi_map;
@@ -34,6 +35,7 @@ mod input;
 pub mod layout;
 mod login;
 mod login_globe;
+mod mean_spectrum;
 /// Multi-radio shell: one window, one radio per tab. Native-only — the
 /// browser client drives a single (remote) radio.
 mod multi;

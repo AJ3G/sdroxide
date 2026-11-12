@@ -295,7 +295,7 @@ pub use sonde::{
 };
 pub use spectrum::{
     DEFAULT_DISPLAY_BINS, DEFAULT_ROWS_PER_SEC, MAX_DISPLAY_BINS, MAX_ROWS_PER_SEC, SpectrumConfig,
-    SpectrumFrame,
+    SpectrumFrame, reassign_floor_db_default,
 };
 pub use speech::{
     CallsignStyle, CategoryFlags, DecodeSpeech, FreqStyle, SpeechSettings, TextSpeech, TuneSpeech,
@@ -304,8 +304,9 @@ pub use speech::{
 pub use spot::{Spot, SpotKind};
 pub use sstv::{SstvMode, SstvStatus};
 pub use state::{
-    AtuState, AtuStatus, CESSB_MAX_DB, MAX_DECIMATION, MAX_MANUAL_GAIN_DB, MIN_DECIMATED_RATE_HZ,
-    OffsetState, RadioState, RxId, RxState, SK_FILTER_CLOSE_RANGE_S, SK_FILTER_DEFAULT_CLOSE_S,
+    AtuState, AtuStatus, CESSB_MAX_DB, FM_DECRACKLE_DEFAULT_DIP, FM_DECRACKLE_DIP_RANGE,
+    MAX_DECIMATION, MAX_MANUAL_GAIN_DB, MIN_DECIMATED_RATE_HZ, OffsetState, RadioState, RxId,
+    RxState, SK_FILTER_CLOSE_RANGE_S, SK_FILTER_DEFAULT_AFTER_NR, SK_FILTER_DEFAULT_CLOSE_S,
     SK_FILTER_DEFAULT_OPEN_S, SK_FILTER_DEFAULT_TAU_S, SK_FILTER_DEFAULT_WIDTH,
     SK_FILTER_MAX_WIDTH, SK_FILTER_OPEN_RANGE_S, SK_FILTER_TAU_RANGE_S, SQUELCH_CLOSED_DB,
     SQUELCH_OPEN_DB, SWR_LIMIT_MAX, SWR_LIMIT_MIN, SWR_TUNE_LIMIT_SCALE, TxState, Vfo,

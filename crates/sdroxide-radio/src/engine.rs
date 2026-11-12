@@ -1012,6 +1012,7 @@ impl RxChain {
         if let Some(d) = self.demod.as_mut() {
             d.set_filter(rx.filter_lo, rx.filter_hi);
             d.set_stereo_enabled(stereo_allowed(rx));
+            d.set_fm_decrackle(rx.fm_decrackle, rx.fm_deemph, rx.fm_decrackle_dip);
         }
         let audio_rate =
             self.demod.as_ref().map(|d| d.audio_rate()).unwrap_or_else(|| self.ddc.out_rate());
@@ -1057,6 +1058,7 @@ impl RxChain {
         self.side_buf.clear();
         demod.process(&self.channel_buf, &mut self.audio_buf);
         demod.set_stereo_enabled(stereo_allowed(rx));
+        demod.set_fm_decrackle(rx.fm_decrackle, rx.fm_deemph, rx.fm_decrackle_dip);
         let stereo = demod.take_side(&mut self.side_buf);
         // The decoder's tap, taken *before* the AGC.
         //
@@ -8182,7 +8184,18 @@ impl Engine {
         // A lane that has just become the drawing one answers its first row
         // from the running average — the current spectrum, which is exactly
         // what every build before the row clock drew — and holds from the next.
-        self.lanes().for_each(|a| a.set_read_hold(true));
+        // Peak or mean, as the client asked: set on every lane here, the one
+        // place all of them pass before a row, rather than wherever each is
+        // built.
+        let smooth = self.cfg.smooth;
+        let (reassign, floor_db) = (self.cfg.reassign, self.cfg.reassign_floor_db);
+        let dim_db = self.cfg.reassign_dim_db;
+        self.lanes().for_each(|a| {
+            a.set_smooth(smooth);
+            a.set_reassign(reassign, floor_db);
+            a.set_reassign_dim(dim_db);
+            a.set_read_hold(true);
+        });
         let frame = self.make_spectrum_frame();
         self.lanes().for_each(|a| {
             a.set_read_hold(false);
@@ -9094,6 +9107,19 @@ impl Engine {
             SetAutoNotch { rx, on } => {
                 self.state.rx[rx.index()].auto_notch = on;
                 self.remember_mode_setting(rx, |p| p.auto_notch = Some(on));
+            }
+            SetFmDecrackle { rx, on, deemph, dip } => {
+                let (lo, hi) = sdroxide_types::FM_DECRACKLE_DIP_RANGE;
+                let dip = dip.clamp(lo, hi);
+                let r = &mut self.state.rx[rx.index()];
+                r.fm_decrackle = on;
+                r.fm_deemph = deemph;
+                r.fm_decrackle_dip = dip;
+                self.remember_mode_setting(rx, |p| {
+                    p.fm_decrackle = Some(on);
+                    p.fm_deemph = Some(deemph);
+                    p.fm_decrackle_dip = Some(dip);
+                });
             }
             SetHumFilter { rx, on } => self.state.rx[rx.index()].hum_filter = on,
             SetSkFilter { rx, on, tau_s, open_s, close_s, width, after_nr } => {
