@@ -117,6 +117,7 @@ impl Device {
                     dev.load_remote(&upload)?;
                     dev.remote = true;
                     crate::remote::note_remote();
+                    crate::remote::note_loaded(dev.rate_hz);
                 }
                 Err(w) => {
                     dev.rate_hz = crate::remote::STANDALONE_RATE_HZ;
