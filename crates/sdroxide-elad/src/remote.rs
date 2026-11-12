@@ -61,7 +61,7 @@
 //! [`RESTORE_BEGIN`] and no upload, as FDM-SW2 does.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -205,6 +205,38 @@ pub(crate) fn went_remote() -> bool {
 /// After the radio has gone back to its own image.
 pub(crate) fn forget_remote() {
     WENT_REMOTE.store(false, Ordering::Relaxed);
+    LOADED_HZ.store(0, Ordering::Relaxed);
+}
+
+/// The wide image this process last put in the radio, 0 for none (or after a
+/// restore). Only for the diagnostic report.
+static LOADED_HZ: AtomicU32 = AtomicU32::new(0);
+
+/// After a wide image has been loaded and acknowledged.
+pub(crate) fn note_loaded(rate_hz: u32) {
+    LOADED_HZ.store(rate_hz, Ordering::Relaxed);
+}
+
+/// The FDM-DUO's lines for the diagnostic report, in place of the FDM-S
+/// loader's: the DUO boots its own 192 kHz FPGA image and never uses
+/// `elad-firmware`; wider spans are images taken from ELAD's DLL.
+pub fn status_line() -> String {
+    let image = match LOADED_HZ.load(Ordering::Relaxed) {
+        0 if went_remote() => "radio may still be on a wide image (restore pending)".to_string(),
+        0 => format!(
+            "radio's own stand-alone image ({} kHz) — nothing loaded by sdroxide",
+            STANDALONE_RATE_HZ / 1000
+        ),
+        hz => format!("{} kHz image loaded by sdroxide this session", hz / 1000),
+    };
+    let dll = match dll_paths().into_iter().next() {
+        Some(p) => format!("{DLL_NAME}: {}", p.display()),
+        None => format!(
+            "{DLL_NAME}: not found (only needed for spans above {} kHz)",
+            STANDALONE_RATE_HZ / 1000
+        ),
+    };
+    format!("{image}\n{dll}")
 }
 
 /// Whether a restore has already been asked for because the stream arrived at
