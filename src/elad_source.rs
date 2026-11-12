@@ -1048,6 +1048,13 @@ impl IqSource for EladSource {
     /// this, changing anything in Settings → Radio on a running ELAD fails with
     /// "held by another program" — the other program being us.
     fn release(&mut self) {
+        // The CAT serial port too: it is exclusive, and the replacement opens
+        // it again straight away. Dropping the handle only asks its thread to
+        // stop, so a B/W change (a reopen) found COM still held by this one,
+        // got no answer and lost the control link. Same fix as issue #15.
+        if let Control::Serial(cat) = &mut self.control {
+            cat.release();
+        }
         self.handle.release();
     }
 
