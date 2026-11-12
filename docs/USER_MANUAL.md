@@ -11234,6 +11234,10 @@ shown only when the radio is an ELAD. Click it for the next wider rate and
 right-click for the next narrower. Either saves the setting and reopens the
 radio, exactly as changing **Sample rate** here and pressing Apply does; on an
 FDM-DUO that loads the wide image, or puts the radio back in stand-alone.
+Expect a short pause each time: the radio is closed and reopened, a wide image
+takes about 6.5 s to send over USB and be checked by the radio, and going back
+to stand-alone takes about 3.5 s while the radio reboots its own 192 kHz image.
+The waterfall resumes on its own when the radio is ready.
 
 **Attenuator and pre-selection filters.** The pad is the same control as the main
 window's Gain slider. The filters are the low-pass bank in front of the ADC:
