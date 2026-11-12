@@ -1072,12 +1072,9 @@ impl IqSource for EladSource {
         }
         let mut parts = self.status.clone();
         parts.extend(late.iter().cloned());
-        parts.push(
-            "ELAD support is new, and only receiving on an FDM-DUO has been run on a \
-             real radio. If it misbehaves, Settings → Radio has a Copy diagnostic \
-             report button."
-                .to_string(),
-        );
-        Some(parts.join(" — "))
+        // No standing "ELAD support is new" notice here: this is shown at
+        // every open, so a SPAN change put it up again each time and held up
+        // the switch behind it (AJ3G). Settings → Radio already says it.
+        (!parts.is_empty()).then(|| parts.join(" — "))
     }
 }
