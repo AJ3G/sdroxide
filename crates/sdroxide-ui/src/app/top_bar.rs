@@ -4640,8 +4640,6 @@ impl SdroxideApp {
         let caption_w = |c: &str| {
             crate::chrome::text_width(ui, &c.to_uppercase(), egui::FontId::proportional(9.5))
         };
-        let mut labels = labels;
-        labels.push(super::duo_power::DIGI_CHIP);
         MODULE_ROW_SPACING + chip_row_w(ui, &labels).max(caption_w(DUO_PRESETS_CAPTION))
     }
 
@@ -4650,10 +4648,7 @@ impl SdroxideApp {
     /// DUO's menu 34 on that setting now and saves it, so it is sent again at
     /// every connect; see [`super::duo_power`].
     ///
-    /// DIGI rides at the end of the row (AJ3G, 13 Nov 2026): lit when the
-    /// operator hears their own signal on an over sdroxide keyed, saved
-    /// without a reopen and taken at the next key-down. Its partner for the
-    /// radio's own microphone is [`RxChip::Mic`], right of REC.
+    /// Hearing our own overs is beside TUNE instead: [`Self::tx_dig_chip`].
     fn tx_duo_presets(&mut self, ui: &mut egui::Ui, cmds: &mut Vec<Command>) {
         let current = self.radio_cfg.as_ref().map(|r| r.cat.elad_tx_power);
         captioned_chips(ui, DUO_PRESETS_CAPTION, |ui| {
@@ -4673,16 +4668,32 @@ impl SdroxideApp {
                     cmds.push(Command::SetRigPowerStep(code));
                 }
             }
-            let lit = self.radio_cfg.as_ref().is_some_and(|r| r.elad.hear_own_tx);
-            let resp = crate::chrome::chip(ui, lit, super::duo_power::DIGI_CHIP)
-                .on_hover_text(super::duo_power::monitor_hover(1, lit));
-            if resp.clicked()
-                && let Some(cfg) = self.radio_cfg.as_mut()
-            {
-                cfg.elad.hear_own_tx = !lit;
-                cmds.push(Command::SetRadioConfig { cfg: Box::new(cfg.clone()), reopen: false });
-            }
         });
+    }
+
+    /// DIG A, at the end of the TUNE row (AJ3G, 13 Nov 2026): lit when the
+    /// operator hears their own signal on an over sdroxide keyed (the digital
+    /// modes, TUNE, PTT). Saved without a reopen and taken at the next
+    /// key-down. Its partner for the radio's own microphone is
+    /// [`RxChip::Mic`], right of REC. FDM-DUO only, like the power buttons.
+    fn tx_dig_chip(&mut self, ui: &mut egui::Ui, cmds: &mut Vec<Command>) {
+        let lit = self.radio_cfg.as_ref().is_some_and(|r| r.elad.hear_own_tx);
+        let resp = crate::chrome::chip(ui, lit, super::duo_power::DIGI_CHIP)
+            .on_hover_text(super::duo_power::monitor_hover(1, lit));
+        if resp.clicked()
+            && let Some(cfg) = self.radio_cfg.as_mut()
+        {
+            cfg.elad.hear_own_tx = !lit;
+            cmds.push(Command::SetRadioConfig { cfg: Box::new(cfg.clone()), reopen: false });
+        }
+    }
+
+    /// What DIG A adds to the TUNE row's fixed width; 0 where it is not drawn.
+    fn tx_dig_w(&self, ui: &egui::Ui) -> f32 {
+        if !self.duo_presets_apply() {
+            return 0.0;
+        }
+        MODULE_ROW_SPACING + crate::chrome::chip_width(ui, super::duo_power::DIGI_CHIP, None)
     }
 
     /// The tune-carrier level: label + rail + readout.
@@ -4963,6 +4974,9 @@ impl SdroxideApp {
                 self.tx_duo_presets(ui, cmds);
             }
             self.tx_tune_level(ui, cmds);
+            if self.duo_presets_apply() {
+                self.tx_dig_chip(ui, cmds);
+            }
             if mic {
                 self.tx_mic(ui, cmds);
             }
@@ -4982,11 +4996,12 @@ impl SdroxideApp {
     /// The condensed TX box's natural width — [`tx_rows_w_for`] with the
     /// voice keyer's presence read off the current mode.
     fn tx_rows_w(&self, ui: &egui::Ui) -> f32 {
-        tx_rows_w_for(
-            ui,
-            self.state.rx[0].mode.allows_voice_keyer(),
-            self.tx_side_col_w() + self.tx_duo_col_w(ui),
-        )
+        let keyer = self.state.rx[0].mode.allows_voice_keyer();
+        // DIG A lengthens the TUNE row; only what takes it past the Drive row
+        // costs the box anything.
+        let (row1, row2) = tx_rows_fixed_w(ui, keyer);
+        let dig = (row2 + self.tx_dig_w(ui) - row1.max(row2)).max(0.0);
+        tx_rows_w_for(ui, keyer, self.tx_side_col_w() + self.tx_duo_col_w(ui)) + dig
     }
 
     /// What the condensed TX box's right-hand columns cost: the transmit-audio
@@ -5017,6 +5032,7 @@ impl SdroxideApp {
         let duo = self.duo_presets_apply();
         let side_w = self.tx_side_col_w() + self.tx_duo_col_w(ui);
         let (fixed1, fixed2) = tx_rows_fixed_w(ui, keyer);
+        let fixed2 = fixed2 + self.tx_dig_w(ui);
         let inner = w - 2.0 * crate::chrome::MODULE_MARGIN_X - 4.0;
         let rows_w = inner - TX_MIC_GAP - side_w;
         let (rail1, rail2) =
@@ -5034,6 +5050,9 @@ impl SdroxideApp {
                     ui.spacing_mut().slider_width = rail2;
                     self.tx_tune_chip(ui, cmds);
                     self.tx_tune_level(ui, cmds);
+                    if duo {
+                        self.tx_dig_chip(ui, cmds);
+                    }
                 });
             });
             if duo {
@@ -6689,7 +6708,7 @@ fn bw_chip_hint(mode: Mode, lo: f32, hi: f32) -> String {
 /// The RX box's chip run in a mode: the six every mode carries, then whatever
 /// the mode itself brings — a subcarrier to read, a tone to gate on.
 ///
-/// `mic` adds the FDM-DUO's MIC chip right of REC (see [`RxChip::Mic`]).
+/// `mic` adds the FDM-DUO's MIC A chip right of REC (see [`RxChip::Mic`]).
 fn rx_chips(mode: Mode, mic: bool) -> Vec<RxChip> {
     // MONO is not among them: it is the *recording's* channel layout, and it
     // now sits beside the recording controls it belongs to, inside the REC

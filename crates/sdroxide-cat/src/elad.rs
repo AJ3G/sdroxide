@@ -408,7 +408,7 @@ impl Protocol for Elad {
     /// `IF;`, the TS-480 status read the DUO keeps from Kenwood's set, so an
     /// over keyed at the radio — its microphone PTT — is known here. Whether
     /// receive audio is muted for it is the engine's call, live, from
-    /// [`CatConfig::elad_mute_on_radio_ptt`] (the MIC chip right of REC). The
+    /// [`CatConfig::elad_mute_on_radio_ptt`] (the MIC A chip right of REC). The
     /// reply is positional, and a radio laid out differently simply never
     /// reports an over (see [`crate::kenwood::if_transmitting`]).
     fn tx_state_requests(&self) -> Vec<Vec<u8>> {

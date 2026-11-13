@@ -1039,7 +1039,7 @@ pub struct CatConfig {
     /// microphone PTT, a foot switch, another program — which sdroxide learns
     /// of by asking the radio (`IF;`). Off, the receiver plays the station's
     /// own signal through the speakers. On by default; serial CAT only. Read
-    /// live (the MIC chip right of REC is lit when this is off).
+    /// live (the MIC A chip right of REC is lit when this is off).
     #[serde(default = "default_true_elad")]
     pub elad_mute_on_radio_ptt: bool,
     pub format: SoundFormat,
@@ -3566,7 +3566,7 @@ pub struct EladConfig {
     /// Keep receiving through an over sdroxide keyed (TUNE, PTT, the digital
     /// modes), so the station's own signal is heard on the speakers as the
     /// receiver picks it up. Off by default: receive is paused for an over.
-    /// Taken at each key-down (the DIGI chip beside the TX power buttons).
+    /// Taken at each key-down (the DIG A chip beside TUNE).
     pub hear_own_tx: bool,
 }
 

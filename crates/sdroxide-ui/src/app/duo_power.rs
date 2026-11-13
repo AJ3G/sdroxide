@@ -24,16 +24,16 @@ pub(in crate::app) fn hover(code: u8) -> String {
     }
 }
 
-/// Hearing your own signal, on the front panel (AJ3G, 13 Nov 2026). MIC, right
-/// of REC: hear an over keyed at the radio itself (its microphone PTT), the
-/// inverse of `CatConfig::elad_mute_on_radio_ptt`.
-pub(in crate::app) const MIC_CHIP: &str = "MIC";
+/// Hearing your own signal, on the front panel (AJ3G, 13 Nov 2026). MIC A,
+/// right of REC: hear an over keyed at the radio itself (its microphone PTT),
+/// the inverse of `CatConfig::elad_mute_on_radio_ptt`.
+pub(in crate::app) const MIC_CHIP: &str = "MIC A";
 
-/// DIGI, at the end of the power buttons: hear an over sdroxide keyed (the
+/// DIG A, at the end of the TUNE row: hear an over sdroxide keyed (the
 /// digital modes, TUNE, PTT), `EladConfig::hear_own_tx`.
-pub(in crate::app) const DIGI_CHIP: &str = "DIGI";
+pub(in crate::app) const DIGI_CHIP: &str = "DIG A";
 
-/// The hover for MIC (0) or DIGI (1).
+/// The hover for MIC A (0) or DIG A (1).
 pub(in crate::app) fn monitor_hover(i: usize, lit: bool) -> String {
     let state = if lit { "On: you hear it." } else { "Off: the speakers are quiet for it." };
     match i {

@@ -2714,11 +2714,11 @@ struct Engine {
     /// nothing here modulates. It only watches.
     rig_tx: bool,
     /// ELAD only: mute the speakers for an over keyed at the radio itself
-    /// (`CatConfig::elad_mute_on_radio_ptt`, the MIC chip right of REC when
+    /// (`CatConfig::elad_mute_on_radio_ptt`, the MIC A chip right of REC when
     /// off). Read live, so the chip needs no reopen.
     elad_mute_rig_tx: bool,
     /// ELAD only: keep reading the receiver through an over sdroxide keyed
-    /// (`EladConfig::hear_own_tx`, the DIGI chip by TX power). Taken at each
+    /// (`EladConfig::hear_own_tx`, the DIG A chip beside TUNE). Taken at each
     /// key-down rather than at open, so it too needs no reopen.
     elad_hear_own_tx: bool,
     /// The transmit frequency the source has already been told, so
@@ -10438,7 +10438,7 @@ impl Engine {
                 // And the S-meter calibration, live for the same reason: it is
                 // set by watching the meter while dragging the control.
                 self.radio_cal_db = cfg.s_meter_cal_db;
-                // The ELAD's MIC and DIGI chips, live: the mic-PTT mute applies to
+                // The ELAD's MIC A and DIG A chips, live: the mic-PTT mute applies to
                 // an over already under way, and hearing our own overs is
                 // taken at the next key-down.
                 self.elad_hear_own_tx = cfg.elad.hear_own_tx;
@@ -16795,7 +16795,7 @@ impl Engine {
             return;
         }
         // An ELAD owner can choose to hear their own microphone over
-        // (the MIC chip): the over is still known, just not muted.
+        // (the MIC A chip): the over is still known, just not muted.
         let mute = on && (self.caps.driver != "elad" || self.elad_mute_rig_tx);
         if let Some(mixer) = self.mixer.as_mut() {
             mixer.tx_muted = mute;
@@ -17076,8 +17076,8 @@ impl Engine {
                     // is left alone: it is still being read, so anything it
                     // drops there it really did drop.
                     // An ELAD streams through every over; whether it is read
-                    // through this one is the operator's DIGI chip
-                    // choice (the DIGI chip), taken here so it needs no reopen.
+                    // through this one is the operator's DIG A chip
+                    // choice (the DIG A chip), taken here so it needs no reopen.
                     if self.caps.driver == "elad" && self.caps.tx_channels > 0 {
                         self.caps.full_duplex = self.elad_hear_own_tx;
                     }
