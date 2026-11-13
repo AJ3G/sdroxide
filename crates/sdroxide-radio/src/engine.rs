@@ -19,9 +19,9 @@ use sdroxide_config::BandStacks;
 use sdroxide_digi::{
     AcarsController, AprsController, AtChatController, CwController, DigiAction, DigiController,
     DigiEngine, Fsk441Controller, FsqController, Fst4Controller, HellController, Js8Controller,
-    JtController, JttyController, Msk144Controller, NavtexController, PacketController, Pi4Controller,
-    Q65Controller, RadeController, RfPaintController, RifpController, SstvController,
-    TextModemController, WefaxController, WsprController,
+    JtController, JttyController, Msk144Controller, NavtexController, PacketController,
+    Pi4Controller, Q65Controller, RadeController, RfPaintController, RifpController,
+    SstvController, TextModemController, WefaxController, WsprController,
 };
 use sdroxide_drm::DrmDemod;
 use sdroxide_dsp::{
@@ -2713,6 +2713,14 @@ struct Engine {
     /// is not driving that over and must not try to, so nothing here keys, and
     /// nothing here modulates. It only watches.
     rig_tx: bool,
+    /// ELAD only: mute the speakers for an over keyed at the radio itself
+    /// (`CatConfig::elad_mute_on_radio_ptt`, the MIC chip right of REC when
+    /// off). Read live, so the chip needs no reopen.
+    elad_mute_rig_tx: bool,
+    /// ELAD only: keep reading the receiver through an over sdroxide keyed
+    /// (`EladConfig::hear_own_tx`, the DIGI chip by TX power). Taken at each
+    /// key-down rather than at open, so it too needs no reopen.
+    elad_hear_own_tx: bool,
     /// The transmit frequency the source has already been told, so
     /// [`Self::push_tx_freq`] only speaks when it moves.
     tx_freq_told: Option<f64>,
@@ -4371,6 +4379,8 @@ fn engine_thread(
         voice_blocks: 0,
         hw_ptt: false,
         rig_tx: false,
+        elad_mute_rig_tx: radio_cfg.cat.elad_mute_on_radio_ptt,
+        elad_hear_own_tx: radio_cfg.elad.hear_own_tx,
         tx_freq_told: None,
         drive_trim_db: 0.0,
         drive_trim: radio_cfg.tx_drive_trim.clone(),
@@ -10428,6 +10438,15 @@ impl Engine {
                 // And the S-meter calibration, live for the same reason: it is
                 // set by watching the meter while dragging the control.
                 self.radio_cal_db = cfg.s_meter_cal_db;
+                // The ELAD's MIC and DIGI chips, live: the mic-PTT mute applies to
+                // an over already under way, and hearing our own overs is
+                // taken at the next key-down.
+                self.elad_hear_own_tx = cfg.elad.hear_own_tx;
+                if self.elad_mute_rig_tx != cfg.cat.elad_mute_on_radio_ptt {
+                    self.elad_mute_rig_tx = cfg.cat.elad_mute_on_radio_ptt;
+                    let on = self.rig_tx;
+                    self.follow_rig_tx(on);
+                }
                 // Announced from the store rather than echoed from `cfg`, so
                 // what every client shows is what was actually written — a
                 // failed save leaves them on the configuration the radio is
@@ -16775,9 +16794,12 @@ impl Engine {
         if !self.source.mutes_rx_audio_on_rig_tx() {
             return;
         }
+        // An ELAD owner can choose to hear their own microphone over
+        // (the MIC chip): the over is still known, just not muted.
+        let mute = on && (self.caps.driver != "elad" || self.elad_mute_rig_tx);
         if let Some(mixer) = self.mixer.as_mut() {
-            mixer.tx_muted = on;
-            mixer.rx_rec_enabled = !on;
+            mixer.tx_muted = mute;
+            mixer.rx_rec_enabled = !mute;
         }
     }
 
@@ -17053,6 +17075,12 @@ impl Engine {
                     // to throw away is an over and not an overrun. Full duplex
                     // is left alone: it is still being read, so anything it
                     // drops there it really did drop.
+                    // An ELAD streams through every over; whether it is read
+                    // through this one is the operator's DIGI chip
+                    // choice (the DIGI chip), taken here so it needs no reopen.
+                    if self.caps.driver == "elad" && self.caps.tx_channels > 0 {
+                        self.caps.full_duplex = self.elad_hear_own_tx;
+                    }
                     if !self.caps.full_duplex {
                         self.source.set_rx_paused(true);
                     }

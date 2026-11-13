@@ -1035,11 +1035,11 @@ pub struct CatConfig {
     /// which is what was always sent until then.
     #[serde(default = "default_elad_tx_power")]
     pub elad_tx_power: u8,
-    /// Ask an ELAD FDM-DUO whether it is transmitting (`IF;`), so an over
-    /// keyed at the radio — its microphone PTT, a foot switch, another program
-    /// — is known here and receive audio is muted for its length. Without it
-    /// the receiver plays the station's own signal through the speakers. On by
-    /// default; serial CAT only.
+    /// Mute receive audio for an over keyed at an ELAD FDM-DUO itself — its
+    /// microphone PTT, a foot switch, another program — which sdroxide learns
+    /// of by asking the radio (`IF;`). Off, the receiver plays the station's
+    /// own signal through the speakers. On by default; serial CAT only. Read
+    /// live (the MIC chip right of REC is lit when this is off).
     #[serde(default = "default_true_elad")]
     pub elad_mute_on_radio_ptt: bool,
     pub format: SoundFormat,
@@ -3566,6 +3566,7 @@ pub struct EladConfig {
     /// Keep receiving through an over sdroxide keyed (TUNE, PTT, the digital
     /// modes), so the station's own signal is heard on the speakers as the
     /// receiver picks it up. Off by default: receive is paused for an over.
+    /// Taken at each key-down (the DIGI chip beside the TX power buttons).
     pub hear_own_tx: bool,
 }
 

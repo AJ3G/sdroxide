@@ -239,20 +239,11 @@ pub struct Elad {
     /// True once the radio has named itself, so a later `DT`/`VS` reply cannot
     /// re-announce the same rig on every poll.
     identified: bool,
-    /// Whether to ask the rig if it is transmitting ([`CatConfig::elad_mute_on_radio_ptt`]).
-    watch_tx: bool,
 }
 
 impl Elad {
-    pub fn new(tx_input: EladTxInput, tx_power: u8, watch_tx: bool) -> Self {
-        Elad {
-            buf: String::new(),
-            tx_input,
-            tx_power,
-            mode_digit: None,
-            identified: false,
-            watch_tx,
-        }
+    pub fn new(tx_input: EladTxInput, tx_power: u8) -> Self {
+        Elad { buf: String::new(), tx_input, tx_power, mode_digit: None, identified: false }
     }
 
     /// The rig's mode digit as the app's mode.
@@ -415,12 +406,13 @@ impl Protocol for Elad {
         vec![b"FA;".to_vec(), b"MD;".to_vec()]
     }
     /// `IF;`, the TS-480 status read the DUO keeps from Kenwood's set, so an
-    /// over keyed at the radio — its microphone PTT — is known here and receive
-    /// audio is muted for it. Only when [`CatConfig::elad_mute_on_radio_ptt`]
-    /// asks: the reply is positional, and a radio laid out differently simply
-    /// never reports an over (see [`crate::kenwood::if_transmitting`]).
+    /// over keyed at the radio — its microphone PTT — is known here. Whether
+    /// receive audio is muted for it is the engine's call, live, from
+    /// [`CatConfig::elad_mute_on_radio_ptt`] (the MIC chip right of REC). The
+    /// reply is positional, and a radio laid out differently simply never
+    /// reports an over (see [`crate::kenwood::if_transmitting`]).
     fn tx_state_requests(&self) -> Vec<Vec<u8>> {
-        if self.watch_tx { vec![b"IF;".to_vec()] } else { Vec::new() }
+        vec![b"IF;".to_vec()]
     }
     fn dial_requests(&self) -> Vec<Vec<u8>> {
         vec![b"FA;".to_vec()]
@@ -604,13 +596,7 @@ impl Protocol for Elad {
                     info!(duo_type = rest, "ELAD CAT: rig identified");
                 }
             } else if let Some(rest) = msg.strip_prefix("IF") {
-                // A DUO with auto-information on (menu, or left so by another
-                // program) sends `IF` unasked whenever it keys. Turning the
-                // setting off has to ignore those as well as stop asking, or
-                // the speakers are muted for a mic over either way.
-                if !self.watch_tx {
-                    debug!("ELAD CAT: IF reply ignored, transmit watching is off");
-                } else if let Some(on) = crate::kenwood::if_transmitting(rest) {
+                if let Some(on) = crate::kenwood::if_transmitting(rest) {
                     out.push(CatUpdate::Ptt(on));
                 } else {
                     debug!(reply = rest, "ELAD CAT: IF reply not in the TS-480 layout");
@@ -663,7 +649,7 @@ mod tests {
     use super::*;
 
     fn elad() -> Elad {
-        Elad::new(EladTxInput::UsbAudio, TX_POWER_MAX, true)
+        Elad::new(EladTxInput::UsbAudio, TX_POWER_MAX)
     }
 
     fn parse_str(e: &mut Elad, s: &str) -> Vec<CatUpdate> {
@@ -682,7 +668,7 @@ mod tests {
         // Nothing chosen: MAX, as always.
         assert!(frames(elad().clear_offsets()).contains(&"TP09;".to_string()));
         // 5 W chosen: sent at connect instead of MAX.
-        let mut five = Elad::new(EladTxInput::UsbAudio, 8, true);
+        let mut five = Elad::new(EladTxInput::UsbAudio, 8);
         let f = frames(five.clear_offsets());
         assert!(f.contains(&"TP08;".to_string()) && !f.contains(&"TP09;".to_string()));
         // And live from a button.
@@ -785,11 +771,6 @@ mod tests {
         assert!(matches!(parse_str(&mut e, rx).as_slice(), [CatUpdate::Ptt(false)]));
         // A reply of another shape reports nothing rather than a stuck over.
         assert!(parse_str(&mut e, "IF0001407400010;").is_empty());
-        // Off in Settings: never asked.
-        let mut off = Elad::new(EladTxInput::UsbAudio, TX_POWER_MAX, false);
-        assert!(off.tx_state_requests().is_empty());
-        // Nor heeded when the radio volunteers it (auto-information on).
-        assert!(parse_str(&mut off, tx).is_empty());
     }
 
     #[test]
@@ -972,7 +953,7 @@ mod tests {
     #[test]
     fn the_transmit_input_is_asserted_only_when_it_is_configured() {
         let frame_for = |i| {
-            frames(Elad::new(i, TX_POWER_MAX, true).clear_offsets())
+            frames(Elad::new(i, TX_POWER_MAX).clear_offsets())
                 .into_iter()
                 .find(|f| f.starts_with("TI"))
         };
