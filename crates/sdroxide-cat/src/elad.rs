@@ -604,7 +604,13 @@ impl Protocol for Elad {
                     info!(duo_type = rest, "ELAD CAT: rig identified");
                 }
             } else if let Some(rest) = msg.strip_prefix("IF") {
-                if let Some(on) = crate::kenwood::if_transmitting(rest) {
+                // A DUO with auto-information on (menu, or left so by another
+                // program) sends `IF` unasked whenever it keys. Turning the
+                // setting off has to ignore those as well as stop asking, or
+                // the speakers are muted for a mic over either way.
+                if !self.watch_tx {
+                    debug!("ELAD CAT: IF reply ignored, transmit watching is off");
+                } else if let Some(on) = crate::kenwood::if_transmitting(rest) {
                     out.push(CatUpdate::Ptt(on));
                 } else {
                     debug!(reply = rest, "ELAD CAT: IF reply not in the TS-480 layout");
@@ -780,8 +786,10 @@ mod tests {
         // A reply of another shape reports nothing rather than a stuck over.
         assert!(parse_str(&mut e, "IF0001407400010;").is_empty());
         // Off in Settings: never asked.
-        let off = Elad::new(EladTxInput::UsbAudio, TX_POWER_MAX, false);
+        let mut off = Elad::new(EladTxInput::UsbAudio, TX_POWER_MAX, false);
         assert!(off.tx_state_requests().is_empty());
+        // Nor heeded when the radio volunteers it (auto-information on).
+        assert!(parse_str(&mut off, tx).is_empty());
     }
 
     #[test]
