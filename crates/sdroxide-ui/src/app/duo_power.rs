@@ -29,7 +29,7 @@ pub(in crate::app) fn hover(code: u8) -> String {
 /// the inverse of `CatConfig::elad_mute_on_radio_ptt`.
 pub(in crate::app) const MIC_CHIP: &str = "MIC A";
 
-/// DIG A, at the end of the TUNE row: hear an over sdroxide keyed (the
+/// DIG A, under the 3W and 5W buttons: hear an over sdroxide keyed (the
 /// digital modes, TUNE, PTT), `EladConfig::hear_own_tx`.
 pub(in crate::app) const DIGI_CHIP: &str = "DIG A";
 

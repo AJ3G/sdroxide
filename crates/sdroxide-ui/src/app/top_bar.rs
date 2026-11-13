@@ -4572,10 +4572,16 @@ impl SdroxideApp {
     }
 
     /// The Drive label + rail + readout.
-    fn tx_drive(&mut self, ui: &mut egui::Ui, cmds: &mut Vec<Command>) {
+    ///
+    /// `pad` is room left after the label, so the condensed box can start its
+    /// Drive and Tune rails at the same place (0 elsewhere).
+    fn tx_drive(&mut self, ui: &mut egui::Ui, cmds: &mut Vec<Command>, pad: f32) {
         let mut drive = self.state.tx.drive;
         let hover = self.drive_hover();
         ui.label(tr!("topbar-drive")).on_hover_text(&hover);
+        if pad > 0.0 {
+            ui.add_space(pad);
+        }
         if crate::chrome::slider_readout(
             ui,
             value_field_w(ui, "100%"),
@@ -4648,30 +4654,52 @@ impl SdroxideApp {
     /// DUO's menu 34 on that setting now and saves it, so it is sent again at
     /// every connect; see [`super::duo_power`].
     ///
-    /// Hearing our own overs is beside TUNE instead: [`Self::tx_dig_chip`].
+    /// DIG A sits under them, centred on the TUNE row's line (AJ3G, 13 Nov
+    /// 2026), with the caption below it: [`Self::tx_dig_chip`].
     fn tx_duo_presets(&mut self, ui: &mut egui::Ui, cmds: &mut Vec<Command>) {
         let current = self.radio_cfg.as_ref().map(|r| r.cat.elad_tx_power);
-        captioned_chips(ui, DUO_PRESETS_CAPTION, |ui| {
-            for &(label, code) in &super::duo_power::PRESETS {
-                let lit = current == Some(code);
-                let resp = crate::chrome::chip(ui, lit, label)
-                    .on_hover_text(super::duo_power::hover(code));
-                if resp.clicked()
-                    && !lit
-                    && let Some(cfg) = self.radio_cfg.as_mut()
-                {
-                    cfg.cat.elad_tx_power = code;
-                    cmds.push(Command::SetRadioConfig {
-                        cfg: Box::new(cfg.clone()),
-                        reopen: false,
-                    });
-                    cmds.push(Command::SetRigPowerStep(code));
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(MODULE_ROW_SPACING, MODULE_ROW_SPACING);
+            let row = ui.horizontal(|ui| {
+                for &(label, code) in &super::duo_power::PRESETS {
+                    let lit = current == Some(code);
+                    let resp = crate::chrome::chip(ui, lit, label)
+                        .on_hover_text(super::duo_power::hover(code));
+                    if resp.clicked()
+                        && !lit
+                        && let Some(cfg) = self.radio_cfg.as_mut()
+                    {
+                        cfg.cat.elad_tx_power = code;
+                        cmds.push(Command::SetRadioConfig {
+                            cfg: Box::new(cfg.clone()),
+                            reopen: false,
+                        });
+                        cmds.push(Command::SetRigPowerStep(code));
+                    }
                 }
-            }
+            });
+            let w = row.response.rect.width();
+            // Centred under the row, which puts it under 3W and 5W.
+            ui.allocate_ui_with_layout(
+                egui::vec2(w, 0.0),
+                egui::Layout::top_down(egui::Align::Center),
+                |ui| {
+                    ui.set_min_width(w);
+                    ui.spacing_mut().item_spacing = egui::vec2(MODULE_ROW_SPACING, 2.0);
+                    self.tx_dig_chip(ui, cmds);
+                    let ink = ui.visuals().widgets.inactive.fg_stroke.color;
+                    ui.label(
+                        RichText::new(DUO_PRESETS_CAPTION.to_uppercase())
+                            .size(9.5)
+                            .strong()
+                            .color(ink),
+                    );
+                },
+            );
         });
     }
 
-    /// DIG A, at the end of the TUNE row (AJ3G, 13 Nov 2026): lit when the
+    /// DIG A, under the TX power buttons (AJ3G, 13 Nov 2026): lit when the
     /// operator hears their own signal on an over sdroxide keyed (the digital
     /// modes, TUNE, PTT). Saved without a reopen and taken at the next
     /// key-down. Its partner for the radio's own microphone is
@@ -4688,18 +4716,14 @@ impl SdroxideApp {
         }
     }
 
-    /// What DIG A adds to the TUNE row's fixed width; 0 where it is not drawn.
-    fn tx_dig_w(&self, ui: &egui::Ui) -> f32 {
-        if !self.duo_presets_apply() {
-            return 0.0;
-        }
-        MODULE_ROW_SPACING + crate::chrome::chip_width(ui, super::duo_power::DIGI_CHIP, None)
-    }
-
-    /// The tune-carrier level: label + rail + readout.
-    fn tx_tune_level(&mut self, ui: &mut egui::Ui, cmds: &mut Vec<Command>) {
+    /// The tune-carrier level: label + rail + readout. `pad` as for
+    /// [`Self::tx_drive`].
+    fn tx_tune_level(&mut self, ui: &mut egui::Ui, cmds: &mut Vec<Command>, pad: f32) {
         let mut tune_drive = self.state.tx.tune_drive;
         ui.label(tr!("topbar-tune-2"));
+        if pad > 0.0 {
+            ui.add_space(pad);
+        }
         if crate::chrome::slider_readout(
             ui,
             value_field_w(ui, "100%"),
@@ -4969,14 +4993,11 @@ impl SdroxideApp {
         let mic = self.state.rx[0].mode.allows_voice_keyer() || !level;
         crate::chrome::control_row(ui, narrow, |ui| {
             self.tx_keyer_chip(ui);
-            self.tx_drive(ui, cmds);
+            self.tx_drive(ui, cmds, 0.0);
             if self.duo_presets_apply() {
                 self.tx_duo_presets(ui, cmds);
             }
-            self.tx_tune_level(ui, cmds);
-            if self.duo_presets_apply() {
-                self.tx_dig_chip(ui, cmds);
-            }
+            self.tx_tune_level(ui, cmds, 0.0);
             if mic {
                 self.tx_mic(ui, cmds);
             }
@@ -4997,11 +5018,7 @@ impl SdroxideApp {
     /// voice keyer's presence read off the current mode.
     fn tx_rows_w(&self, ui: &egui::Ui) -> f32 {
         let keyer = self.state.rx[0].mode.allows_voice_keyer();
-        // DIG A lengthens the TUNE row; only what takes it past the Drive row
-        // costs the box anything.
-        let (row1, row2) = tx_rows_fixed_w(ui, keyer);
-        let dig = (row2 + self.tx_dig_w(ui) - row1.max(row2)).max(0.0);
-        tx_rows_w_for(ui, keyer, self.tx_side_col_w() + self.tx_duo_col_w(ui)) + dig
+        tx_rows_w_for(ui, keyer, self.tx_side_col_w() + self.tx_duo_col_w(ui))
     }
 
     /// What the condensed TX box's right-hand columns cost: the transmit-audio
@@ -5032,11 +5049,14 @@ impl SdroxideApp {
         let duo = self.duo_presets_apply();
         let side_w = self.tx_side_col_w() + self.tx_duo_col_w(ui);
         let (fixed1, fixed2) = tx_rows_fixed_w(ui, keyer);
-        let fixed2 = fixed2 + self.tx_dig_w(ui);
         let inner = w - 2.0 * crate::chrome::MODULE_MARGIN_X - 4.0;
         let rows_w = inner - TX_MIC_GAP - side_w;
-        let (rail1, rail2) =
-            ((rows_w - fixed1).max(STRIP_RAIL_W), (rows_w - fixed2).max(STRIP_RAIL_W));
+        // One rail length for both rows (AJ3G, 13 Nov 2026: the Tune slider
+        // the same length as Drive's). The shorter row's label is padded, so
+        // the rails start together and the readouts still end flush.
+        let rail = (rows_w - fixed1.max(fixed2)).max(STRIP_RAIL_W);
+        let (rail1, rail2) = (rail, rail);
+        let (pad1, pad2) = ((fixed2 - fixed1).max(0.0), (fixed1 - fixed2).max(0.0));
         crate::chrome::module_bare_h(ui, w, crate::chrome::MODULE_TALL_H, |ui| {
             ui.spacing_mut().item_spacing = egui::vec2(MODULE_ROW_SPACING, MODULE_ROW_SPACING);
             ui.vertical(|ui| {
@@ -5044,15 +5064,12 @@ impl SdroxideApp {
                     ui.spacing_mut().slider_width = rail1;
                     self.tx_ptt_chip(ui, cmds);
                     self.tx_keyer_chip(ui);
-                    self.tx_drive(ui, cmds);
+                    self.tx_drive(ui, cmds, pad1);
                 });
                 ui.horizontal(|ui| {
                     ui.spacing_mut().slider_width = rail2;
                     self.tx_tune_chip(ui, cmds);
-                    self.tx_tune_level(ui, cmds);
-                    if duo {
-                        self.tx_dig_chip(ui, cmds);
-                    }
+                    self.tx_tune_level(ui, cmds, pad2);
                 });
             });
             if duo {
@@ -6124,26 +6141,6 @@ pub(in crate::app) const DISPLAY_VIEW_CHIPS: [&str; 3] = ["☀ 3D", "SPEC", "WID
 /// and the FFT/levels popup. Read by the measurement and by each chip's own
 /// draw site.
 const DISPLAY_TOOL_CHIPS: [&str; 4] = ["FIT", "CTR", "SKIM", "FFT"];
-
-/// A row of chips with a caption centred underneath, in the chips' own ink, so
-/// it reads as the name of the buttons rather than a separate menu heading —
-/// the FDM-DUO's TX PWR column beside Drive.
-fn captioned_chips(ui: &mut egui::Ui, caption: &str, chips: impl FnOnce(&mut egui::Ui)) {
-    ui.vertical(|ui| {
-        ui.spacing_mut().item_spacing = egui::vec2(MODULE_ROW_SPACING, 2.0);
-        let row = ui.horizontal(chips);
-        let ink = ui.visuals().widgets.inactive.fg_stroke.color;
-        let w = row.response.rect.width();
-        ui.allocate_ui_with_layout(
-            egui::vec2(w, 0.0),
-            egui::Layout::top_down(egui::Align::Center),
-            |ui| {
-                ui.set_min_width(w);
-                ui.label(RichText::new(caption.to_uppercase()).size(9.5).strong().color(ink));
-            },
-        );
-    });
-}
 
 /// The caption under the FDM-DUO's power presets (AJ3G, 18 Oct 2026).
 const DUO_PRESETS_CAPTION: &str = "ELAD FDM-DUO TX PWR";

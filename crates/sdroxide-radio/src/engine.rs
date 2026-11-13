@@ -2718,7 +2718,7 @@ struct Engine {
     /// off). Read live, so the chip needs no reopen.
     elad_mute_rig_tx: bool,
     /// ELAD only: keep reading the receiver through an over sdroxide keyed
-    /// (`EladConfig::hear_own_tx`, the DIG A chip beside TUNE). Taken at each
+    /// (`EladConfig::hear_own_tx`, the DIG A chip under TX power). Taken at each
     /// key-down rather than at open, so it too needs no reopen.
     elad_hear_own_tx: bool,
     /// The transmit frequency the source has already been told, so

@@ -3566,7 +3566,7 @@ pub struct EladConfig {
     /// Keep receiving through an over sdroxide keyed (TUNE, PTT, the digital
     /// modes), so the station's own signal is heard on the speakers as the
     /// receiver picks it up. Off by default: receive is paused for an over.
-    /// Taken at each key-down (the DIG A chip beside TUNE).
+    /// Taken at each key-down (the DIG A chip under the TX power buttons).
     pub hear_own_tx: bool,
 }
 
