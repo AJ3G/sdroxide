@@ -414,6 +414,15 @@ impl Protocol for Elad {
     fn tx_state_requests(&self) -> Vec<Vec<u8>> {
         vec![b"IF;".to_vec()]
     }
+    /// Asked every 150 ms rather than with the meters (every 500 ms at the
+    /// default poll rate): the DUO's receiver plays straight through a
+    /// microphone over, so how soon the mute lands is how much of the first
+    /// syllable comes out of the speakers (AJ3G, 13 Nov 2026: "a significant
+    /// lag on the PTT"). The reply is 38 bytes, a small share of even a
+    /// 9600-baud link.
+    fn tx_state_period(&self) -> Option<std::time::Duration> {
+        Some(std::time::Duration::from_millis(150))
+    }
     fn dial_requests(&self) -> Vec<Vec<u8>> {
         vec![b"FA;".to_vec()]
     }
@@ -763,6 +772,8 @@ mod tests {
     fn a_radio_keyed_at_its_own_mic_is_reported_from_if() {
         let mut e = elad();
         assert_eq!(frames(e.tx_state_requests()), vec!["IF;"]);
+        // On a beat of its own, well inside a syllable.
+        assert!(e.tx_state_period().is_some_and(|p| p.as_millis() <= 200));
         // TS-480 layout: 11 freq, 5 step, 5 RIT, RIT, XIT, bank, 2 channel,
         // then the TX flag at offset 26, 35 characters in all.
         let tx = "IF000140740000000+0000000000120000000;";
