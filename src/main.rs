@@ -1281,6 +1281,7 @@ fn converter_plan(radio: &RadioConfig) -> sdroxide_radio::ConverterPlan {
             tx_offset_hz: tx_offset,
             // A ceiling of 1.0 is no ceiling; anything less is one.
             tx_drive: (x.tx_drive < 1.0).then(|| x.tx_drive.clamp(0.0, 1.0)),
+            rf_out: x.elad_rf_out,
         });
         tracing::info!(
             "transverter {}: {:.3}–{:.3} MHz on the dial, hardware {:.6} MHz {}; transmit {}",
@@ -1315,6 +1316,7 @@ fn converter_plan(radio: &RadioConfig) -> sdroxide_radio::ConverterPlan {
             rx_offset_hz: offset,
             tx_offset_hz: tx_offset,
             tx_drive: None,
+            rf_out: false,
         });
     }
     sdroxide_radio::ConverterPlan::from_steps(steps)
@@ -1916,6 +1918,7 @@ fn elad_caps(src: &elad_source::EladSource) -> DeviceCaps {
     DeviceCaps {
         driver: "elad".into(),
         label: src.describe(),
+        rx_antenna_is_xvtr: true,
         rx_channels: 1,
         tx_channels: usize::from(tx),
         full_duplex: false,
@@ -2870,6 +2873,7 @@ fn cat_caps(radio: &RadioConfig) -> DeviceCaps {
     DeviceCaps {
         driver: "cat".into(),
         label: format!("{} (CAT)", radio.cat.family.label()),
+        rx_antenna_is_xvtr: radio.cat.family == sdroxide_types::CatFamily::Elad,
         rx_channels: 1,
         tx_channels: 1,
         audio_mode: demod,
@@ -2972,6 +2976,7 @@ mod tests {
             rx_offset_hz: -116_000_000.0,
             tx_offset_hz: Some(-116_000_000.0),
             tx_drive: Some(0.02),
+            rf_out: false,
         }]);
         let converted = plan_caps(caps, &plan, &[], &[]);
         assert!(converted.may_tx_hz(146_820_000.0 - 600_000.0));

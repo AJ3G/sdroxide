@@ -168,6 +168,9 @@ pub struct SdroxideApp {
     /// ends, so the tune box can still show what the antenna was matched to.
     /// Cleared when a different radio is connected.
     last_swr: Option<f32>,
+    /// The ELAD receive socket the XVTR chip moved off when it was lit, so
+    /// putting the chip out puts the receiver back where it was.
+    xvtr_prev_ant: Option<String>,
     memories: Vec<MemoryChannel>,
     mem_folders: Vec<MemoryFolder>,
     /// The scanner's settings, mirrored from the engine and edited in place —
@@ -1593,6 +1596,7 @@ impl SdroxideApp {
             wide_wf: Default::default(),
             meters: None,
             last_swr: None,
+            xvtr_prev_ant: None,
             memories: Vec::new(),
             mem_folders: Vec::new(),
             scanner: sdroxide_types::ScannerConfig::default(),
