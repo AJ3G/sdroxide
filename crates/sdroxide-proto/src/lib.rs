@@ -1706,7 +1706,26 @@ use sdroxide_types::{
 /// `ScannerConfig` gains `stop_snr`, `snr_db` and `pano_usable` after
 /// `follow_squelch`, and `ScanState` gains `sweeps` and `sweep_ms`, which
 /// changes the layout of every state frame.
-pub const PROTO_VERSION: u16 = 206;
+///
+/// v207: PANO pause. `ScannerConfig` gains `pano_pause_s` after `pano_usable`,
+/// which changes the layout of `SetScannerConfig` and of the scanner echo.
+///
+/// v208: SDRplay low IF. `SdrPlayConfig` gains `low_if` at its tail, which
+/// changes the layout of every `RadioConfig` sent.
+///
+/// v209: SK boost. `RxState` gains `sk_filter_boost_db` after
+/// `sk_filter_after_nr`, and `Command::SetSkFilter` gains `boost_db`.
+///
+/// v210: truSDX `TrUsdxAudio::OneCableMute` appended, a new value inside
+/// `CatConfig` and so inside every `RadioConfig`.
+///
+/// v211: ELAD monitoring. `CatConfig` gains `elad_mute_on_radio_ptt` and
+/// `EladConfig` gains `hear_own_tx`, which changes every `RadioConfig`.
+///
+/// v212: the Hardrock tuner's last tunes. `AtuNetwork` gains `start_swr` and
+/// `AtuReadout` gains `history` (`Vec<TuneRecord>`) on their tails, which
+/// changes the layout of every `ServerMsg::AmpStatus` with a tuner.
+pub const PROTO_VERSION: u16 = 212;
 const VERSION_BYTE: u8 = 0x12;
 
 #[derive(Debug, thiserror::Error)]

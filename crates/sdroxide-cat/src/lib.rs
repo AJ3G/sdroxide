@@ -1310,7 +1310,7 @@ fn make_protocol(cfg: &CatConfig) -> Box<dyn Protocol> {
         // The one family whose audio is *in* the byte stream: the serial
         // thread routes bytes to the profile's own demultiplexer rather than
         // expecting a sound card (see `Protocol::streams_audio`).
-        CatFamily::TrUsdx => Box::new(trusdx::TrUsdx::new(cfg.trusdx_audio.streams_audio())),
+        CatFamily::TrUsdx => Box::new(trusdx::TrUsdx::new(cfg.trusdx_audio)),
         CatFamily::Rigctld => Box::new(rigctld::Rigctld::new()),
         CatFamily::Flrig => Box::new(flrig::Flrig::new(cfg.flrig_addr.trim().to_string())),
     }
@@ -2903,7 +2903,8 @@ fn serial_thread(
         // The rig's own transmit state, where the profile wants it asked on a
         // beat of its own (`Protocol::tx_state_period`).
         let tx_state_period = protocol.tx_state_period();
-        let mut next_tx_state = Instant::now();
+        // First read one beat in, like the meters: not into the opening exchange.
+        let mut next_tx_state = Instant::now() + tx_state_period.unwrap_or_default();
         let mut ptt = false;
         // When a CAT key-down was last written, so the rig's refusal of one can
         // be told from the refusals its unimplemented sub-commands answer with.
@@ -3364,8 +3365,8 @@ fn serial_thread(
             // hear it — so without this the session would be silent, with a
             // control link that worked perfectly.
             // Re-arm the stream when no audio has arrived for a moment. The
-            // enable is `UA0;UA1;`, so it is safe to send over a healthy stream
-            // as well as a dead one — but the idle test is what keeps it off a
+            // enable is `UA0;UA1;` (`UA2;` with the speaker muted), so it is
+            // safe to send over a healthy stream as well as a dead one — but the idle test is what keeps it off a
             // healthy one, because a command written while the stream is
             // running is what kills this firmware in the first place.
             if streaming

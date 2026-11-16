@@ -2560,6 +2560,9 @@ impl SdroxideApp {
         if self.elad_bw_applies() {
             front.push(&["SPAN 6144k"]);
         }
+        if self.sdrplay_if_applies() {
+            front.push(&["ZERO IF", "LOW IF"]);
+        }
         rx_rows(
             ui,
             &rails,
@@ -2567,7 +2570,7 @@ impl SdroxideApp {
             self.decim_range().is_some(),
             self.state.rx[0].agc == AgcMode::Off,
             self.state.rx[0].mode,
-            self.duo_presets_apply(),
+            self.elad_monitor_chips(),
         )
     }
 
@@ -2797,6 +2800,56 @@ impl SdroxideApp {
         }
     }
 
+    /// Whether the radio is an SDRplay RSP, whose single tuner can run at zero
+    /// IF or at a low IF ([`sdroxide_types::SdrPlayConfig::low_if`]).
+    fn sdrplay_if_applies(&self) -> bool {
+        self.caps.as_ref().is_some_and(|c| c.driver == "sdrplay")
+    }
+
+    /// ZERO IF / LOW IF: the RSP's IF arrangement, named as it stands. A click
+    /// switches to the other one, saves it and reopens the radio, as Apply in
+    /// Settings does: the service takes a new IF only at the start of a
+    /// session. From a rate wider than the low IF reaches, the click goes to
+    /// 2 Msps at the low IF. Greyed at LOW IF while an RSPduo runs both
+    /// tuners, which are at a low IF anyway.
+    // Why: HDZ 2026-11-13: "im Panel wäre noch Platz für einen Chip zeroIF".
+    fn sdrplay_if_chip(&mut self, ui: &mut egui::Ui, cmds: &mut Vec<Command>) {
+        if !self.sdrplay_if_applies() {
+            return;
+        }
+        if self.radio_cfg.is_none() {
+            self.radio_cfg = self.ctrl.radio_config();
+        }
+        let Some(sp) = self.radio_cfg.as_ref().map(|r| r.sdrplay.clone()) else { return };
+        let dual = sp.wants_dual_tuner();
+        let low = dual || sp.runs_low_if();
+        let label = if low { "LOW IF" } else { "ZERO IF" };
+        let resp = ui
+            .add_enabled_ui(!dual, |ui| crate::chrome::chip(ui, low, label))
+            .inner
+            // At zero IF the hint says what to do about it.
+            // Why: HDZ 2026-11-13: "mach das Tooltip mit reduce bandwidth to 2
+            //      to use low IF, avoiding signal artifacts".
+            .on_hover_text(if low {
+                tr!("topbar-sdrplay-if-low-hint")
+            } else {
+                tr!("topbar-sdrplay-if-zero-hint")
+            })
+            .on_disabled_hover_text(tr!("topbar-sdrplay-if-dual"));
+        if resp.clicked()
+            && let Some(cfg) = self.radio_cfg.as_mut()
+        {
+            if low {
+                cfg.sdrplay.low_if = false;
+            } else {
+                cfg.sdrplay.low_if = true;
+                cfg.sdrplay.sample_rate_hz =
+                    cfg.sdrplay.sample_rate_hz.min(sdroxide_types::SdrPlayConfig::LOW_IF_MAX_HZ);
+            }
+            cmds.push(Command::SetRadioConfig { cfg: Box::new(cfg.clone()), reopen: true });
+        }
+    }
+
     /// The receiver and filter/noise controls — the body of the RX box, and of
     /// the RX menu. See [`crate::chrome::control_row`] for `narrow`.
     ///
@@ -2808,7 +2861,7 @@ impl SdroxideApp {
         let rx_gains = self.rx_gains();
         let bar_gains = self.bar_gains();
         let front_chips = self.front_chips();
-        let chips = rx_chips(self.state.rx[0].mode, self.duo_presets_apply());
+        let chips = rx_chips(self.state.rx[0].mode, self.elad_monitor_chips());
         // A menu column wraps its rows and is as wide as the menu around it,
         // so there is nothing to balance there: the run stays whole, under the
         // squelch rail, in the order it has always had.
@@ -2917,6 +2970,7 @@ impl SdroxideApp {
             }
             self.decim_chip(ui, cmds);
             self.elad_bw_chip(ui, cmds);
+            self.sdrplay_if_chip(ui, cmds);
             // A cycling chip rather than a combo: a combo inside a menu
             // opens a second popup layer, and clicking it counts as
             // "outside" and closes the menu it was opened from. Four
@@ -4177,6 +4231,7 @@ impl SdroxideApp {
                     close_s: r.sk_filter_close_s,
                     width: r.sk_filter_width,
                     after_nr: r.sk_filter_after_nr,
+                    boost_db: r.sk_filter_boost_db,
                 })
             };
             if crate::chrome::chip(ui, rx.sk_filter, "SK")
@@ -4260,6 +4315,30 @@ impl SdroxideApp {
                     let r = self.state.rx[0];
                     send(cmds, true, &r);
                 }
+                // The boost: behind NR the filter sits behind the AGC too, and
+                // what it takes away stays away. Ahead of the AGC the AGC puts
+                // it back, so the field greys out there.
+                // Why: HDZ 2026-11-13: "beim SK würde ich gerne einen kleinen
+                //      Lautstärke-Booster noch dazu haben".
+                let (lo, hi) = sdroxide_types::SK_FILTER_BOOST_RANGE_DB;
+                let mut b = rx.sk_filter_boost_db;
+                let resp = ui
+                    .add_enabled(
+                        after,
+                        DragValue::new(&mut b)
+                            .range(lo..=hi)
+                            .speed(0.2)
+                            .fixed_decimals(0)
+                            .prefix("+")
+                            .suffix(" dB"),
+                    )
+                    .on_hover_text(tr!("topbar-sk-filter-boost-hint"))
+                    .on_disabled_hover_text(tr!("topbar-sk-filter-boost-before-nr"));
+                if resp.changed() {
+                    self.state.rx[0].sk_filter_boost_db = b; // optimistic echo
+                    let r = self.state.rx[0];
+                    send(cmds, true, &r);
+                }
                 // Back to the recipe the filter started from: τ 0.1 s, open
                 // 0.01 s, close 1 s, width ±1, ahead of NR.
                 // Why: HDZ 2026-11-10: "mach einen Reset dran für Defaults".
@@ -4274,6 +4353,7 @@ impl SdroxideApp {
                     r.sk_filter_close_s = sdroxide_types::SK_FILTER_DEFAULT_CLOSE_S;
                     r.sk_filter_width = sdroxide_types::SK_FILTER_DEFAULT_WIDTH;
                     r.sk_filter_after_nr = sdroxide_types::SK_FILTER_DEFAULT_AFTER_NR;
+                    r.sk_filter_boost_db = sdroxide_types::SK_FILTER_DEFAULT_BOOST_DB;
                     let r = *r;
                     send(cmds, true, &r);
                 }
@@ -5300,6 +5380,13 @@ impl SdroxideApp {
                 && c.label == format!("{} (CAT)", sdroxide_types::CatFamily::Elad.label()))
     }
 
+    /// Whether MIC A and DIG A are offered: the power buttons' radio, but
+    /// over the ELAD backend only. The engine follows both choices for that
+    /// driver alone, so on a CAT rig of the ELAD family they would do nothing.
+    pub(in crate::app) fn elad_monitor_chips(&self) -> bool {
+        self.duo_presets_apply() && self.caps.as_ref().is_some_and(|c| c.driver == "elad")
+    }
+
     /// What the presets column costs beside the TX rows, its gap included; 0
     /// where it is not drawn.
     fn tx_duo_col_w(&self, ui: &egui::Ui) -> f32 {
@@ -5359,7 +5446,9 @@ impl SdroxideApp {
                             .strong()
                             .color(ink),
                     );
-                    self.tx_dig_chip(ui, cmds);
+                    if self.elad_monitor_chips() {
+                        self.tx_dig_chip(ui, cmds);
+                    }
                 },
             );
         });
@@ -6003,6 +6092,9 @@ impl SdroxideApp {
             // block of minutes-old band, drawn as if it were the last few
             // seconds. Start it again from now instead.
             self.wide_wf.clear();
+            // A loaded recording goes with it: the strip comes back live.
+            #[cfg(not(target_arch = "wasm32"))]
+            self.rec_tab.forget_view();
         }
     }
 

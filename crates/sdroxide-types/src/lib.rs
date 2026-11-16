@@ -106,7 +106,8 @@ pub use ais::{
 pub use alert::{AlertEvent, AlertEvents, AlertReply, AlertRule, AlertSettings, AlertSound};
 pub use amp::{
     AMP_BAUD_RATES, AmpAction, AmpAlerts, AmpConfig, AmpGauge, AmpLevel, AmpLimits, AmpModel,
-    AmpReadings, AmpStatus, AtuNetwork, AtuReadout, AtuScale, amp_band_label,
+    AmpReadings, AmpStatus, AtuNetwork, AtuReadout, AtuScale, TUNE_HISTORY, TUNE_RESULT_BYPASSED,
+    TUNE_RESULT_TUNED, TuneRecord, amp_band_label,
 };
 pub use aprs::{
     APRS_MESSAGE_MAX, APRS_MSG_RETRIES, APRS_STATION_MAX, APRS_TRACK_MAX, APRS_TRAFFIC_MAX,
@@ -307,11 +308,12 @@ pub use sstv::{SstvMode, SstvStatus};
 pub use state::{
     AtuState, AtuStatus, CESSB_MAX_DB, FM_DECRACKLE_DEFAULT_DIP, FM_DECRACKLE_DIP_RANGE,
     MAX_DECIMATION, MAX_MANUAL_GAIN_DB, MIN_DECIMATED_RATE_HZ, OffsetState, RadioState, RxId,
-    RxState, SK_FILTER_CLOSE_RANGE_S, SK_FILTER_DEFAULT_AFTER_NR, SK_FILTER_DEFAULT_CLOSE_S,
-    SK_FILTER_DEFAULT_OPEN_S, SK_FILTER_DEFAULT_TAU_S, SK_FILTER_DEFAULT_WIDTH,
-    SK_FILTER_MAX_WIDTH, SK_FILTER_OPEN_RANGE_S, SK_FILTER_TAU_RANGE_S, SQUELCH_CLOSED_DB,
-    SQUELCH_OPEN_DB, SWR_LIMIT_MAX, SWR_LIMIT_MIN, SWR_TUNE_LIMIT_SCALE, TxState, Vfo,
-    ZOOM_LANE_MARGIN, max_decimation, panadapter_fft_ceiling, swr_tune_limit, zoom_lane_decimation,
+    RxState, SK_FILTER_BOOST_RANGE_DB, SK_FILTER_CLOSE_RANGE_S, SK_FILTER_DEFAULT_AFTER_NR,
+    SK_FILTER_DEFAULT_BOOST_DB, SK_FILTER_DEFAULT_CLOSE_S, SK_FILTER_DEFAULT_OPEN_S,
+    SK_FILTER_DEFAULT_TAU_S, SK_FILTER_DEFAULT_WIDTH, SK_FILTER_MAX_WIDTH, SK_FILTER_OPEN_RANGE_S,
+    SK_FILTER_TAU_RANGE_S, SQUELCH_CLOSED_DB, SQUELCH_OPEN_DB, SWR_LIMIT_MAX, SWR_LIMIT_MIN,
+    SWR_TUNE_LIMIT_SCALE, TxState, Vfo, ZOOM_LANE_MARGIN, max_decimation, panadapter_fft_ceiling,
+    swr_tune_limit, zoom_lane_decimation,
 };
 pub use station::StationConfig;
 pub use tciserver::TciServerConfig;

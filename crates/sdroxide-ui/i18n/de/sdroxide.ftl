@@ -1881,7 +1881,13 @@ settings-radio-no-rsps-press-rescan-needs = keine RSPs — Erneut suchen drücke
 settings-radio-both-tuners-running-api-fixes = Laufen beide Tuner, fixiert die API den ADC auf 6 MHz und gibt 2 Msps aus einer niedrigen ZF zurück — 2 Msps sind daher der breiteste Bereich, und die schmaleren sind davon dezimiert. Wirkt nach Übernehmen.
 settings-radio-rates-below-2-msps-run = Raten unter 2 Msps laufen mit dem ADC bei 2 Msps und dezimieren im Dienst. Wirkt nach Übernehmen.
 settings-radio-reduced-adc-resolution = {"  "}(verringerte ADC-Auflösung)
+topbar-sdrplay-if-hint = Einzelner Tuner auf niedriger ZF (1,620 MHz) statt Null-ZF: keine DC-Spitze, kein LO-Durchsprechen, kein Spiegel in der Mitte. Vorgabe bis 2 Msps; breitere Raten laufen auf Null-ZF, ein Klick dort setzt 2 Msps auf niedriger ZF. Umschalten öffnet das Radio neu.
+topbar-sdrplay-if-low-hint = Niedrige ZF (1,620 MHz): keine DC-Spitze, kein LO-Durchsprechen, kein Spiegel in der Mitte. Klick: Null-ZF, für Raten über 2 Msps.
+topbar-sdrplay-if-zero-hint = Null-ZF: DC-Spitze, LO-Durchsprechen und Spiegel in der Mitte sehen aus wie Signale. Bandbreite auf 2 Msps senken, um die niedrige ZF ohne diese Artefakte zu nutzen: Klick.
+topbar-sdrplay-if-dual = Ein RSPduo mit beiden Tunern läuft ohnehin auf niedriger ZF
 settings-radio-if-bandwidth = ZF-Bandbreite
+settings-radio-low-if = Niedrige ZF
+settings-radio-low-if-check = ZF 1,620 MHz bis 2 Msps (wie SDRuno); breitere Raten auf Null-ZF
 settings-radio-tuner-s-analog-filter-auto = Das Analogfilter des Tuners. Automatisch wählt das breiteste, das zur Abtastrate passt. Wirkt nach Übernehmen.
 settings-radio-rsp-s-own-if-gain = Die eigene ZF-Verstärkungsschleife des RSP, vom API-Dienst betrieben. Aus gibt den ZF-Verstärkungsregler an Sie zurück — die Einstellung für Messung und digitale Schwachsignal-Betriebsarten.
 settings-radio-agc-set-point = AGC-Sollwert
@@ -2170,7 +2176,9 @@ topbar-sk-filter-close-hint = Schließen: wie schnell es danach zugeht; kurz = w
 topbar-sk-filter-width = Breite
 topbar-sk-filter-width-hint = Glättung der Maske, ±Bins à 47 Hz; breiter = weniger Klingeln, gröber
 topbar-sk-filter-after-nr = nach NR
-topbar-sk-filter-after-nr-hint = SK hinter RNN/DFNR statt vor der AGC (Variante B)
+topbar-sk-filter-after-nr-hint = SK hinter RNN/DFNR — und damit hinter der AGC: was das Filter wegnimmt, bleibt weg (dafür der Booster daneben); aus: vor der AGC, die den Pegel ausgleicht
+topbar-sk-filter-boost-hint = Anhebung nach dem SK-Filter, 0–18 dB (5 dB), weich unter Vollaussteuerung begrenzt: hinter NR gleicht sonst niemand den Pegel aus, den das Filter wegnimmt
+topbar-sk-filter-boost-before-nr = Vor NR gleicht die AGC den Pegel aus; der Booster wirkt nur hinter NR
 topbar-sk-filter-caption = SK-NACHFILTER
 topbar-sk-filter-reset-hint = SK auf Grundwerte: τ 0,1 s, auf 0,01 s, zu 1 s, Breite ±1, vor NR
 topbar-sk-filter-before-nr = vor NR
@@ -4077,6 +4085,69 @@ scanner-settles = Wartet je Abschnitt
 scanner-settles-hint = Wartezeit nach dem Umstimmen, bevor das Spektrum gelesen wird. Länger: ruhigeres Bild, langsamerer Durchlauf.
 scanner-pano-width = Abschnittsbreite
 scanner-pano-width-hint = Anteil der Empfängerbreite je Abschnitt. Weniger: frei vom Randabfall; mehr: schnellerer Durchlauf. Abschnitte überlappen 10 %.
+scanner-pano-pause = Pause nach jeder Zeile
+scanner-pano-pause-hint = Wartezeit nach jedem vollen Durchlauf, bevor der nächste beginnt. 0: ohne Pause.
+scanner-pano-now = Jetzt
+scanner-pano-now-at = bei { $mhz } MHz ({ $pct } %) · Durchlauf { $n }
+scanner-pano-strip = Streifen
+scanner-pano-strip-is = eine Zeile alle { $row } s = { $strip } je Streifen
+scanner-pano-strip-hint = Gemessen: letzter Durchlauf plus Pause, mal { $rows } Zeilen
+scanner-pano-strip-first = nach dem ersten Durchlauf
+rec-db-error = Aufnahme-Datenbank nicht verfügbar: { $err }
+rec-retry = Erneut
+rec-live = LIVE
+rec-live-hint = Zurück zum laufenden Streifen
+rec-stop = ■ STOPP
+rec-record = ● REC
+rec-record-hint = Breitbandstreifen (WIDE) aufnehmen, beginnend mit den Durchläufen darauf:
+    unter PANO eine Zeile je Durchlauf, sonst je Intervall (stärkster Pegel)
+rec-desktop-only = Nur in der Desktop-App: dort liegt die Aufnahme-Datenbank.
+rec-interval = Alle
+rec-interval-hint = Abstand zwischen gespeicherten Zeilen, ab 1 s.
+    120 Zeilen füllen einen Streifen.
+rec-interval-locked = Während der Aufnahme fest
+rec-strip-span = = { $min } min je Streifen
+rec-status-recording = Session { $id } · { $rows } Zeilen · Streifen { $strip } · { $time }
+rec-status-ready = Bereit: nimmt den Breitbandstreifen von { $radio } auf
+rec-status-first-sweep = Bereit: { $radio } · erster Durchlauf läuft …
+rec-status-no-strip = Kein Breitbandstreifen: SCAN → PANO starten oder Empfänger mit WIDE
+rec-db-summary = Datenbank { $size } · { $n } Sessions
+rec-init = DB INIT
+rec-init-hint = Alle Sessions löschen
+rec-init-locked = Erst Aufnahme stoppen
+rec-init-sure = ALLES LÖSCHEN?
+rec-init-armed-hint = Nochmal drücken: alle Sessions endgültig weg
+rec-init-warning = ⚠ Löscht alle { $n } Sessions ({ $size }). Nicht rückgängig zu machen.
+rec-cancel = Abbrechen
+rec-empty = Noch keine Sessions aufgenommen.
+rec-col-when = Start
+rec-col-radio = Funkgerät
+rec-col-bands = Bänder
+rec-col-mhz = MHz
+rec-col-length = Dauer
+rec-col-size = Größe
+rec-col-strips = Streifen
+rec-open-strips = Streifen dieser Session zeigen
+rec-every = Eine Zeile alle { $s } s
+rec-delete = DEL
+rec-delete-hint = Session löschen
+rec-delete-sure = SICHER?
+rec-delete-armed-hint = Nochmal drücken: Session endgültig weg
+rec-rows = { $n } Zeilen
+rec-load = LOAD
+rec-load-hint = Streifen im Breitbandstreifen zeigen
+rec-load-sure = STOPP + LOAD?
+rec-load-armed-hint = Nochmal drücken: Aufnahme stoppt, Streifen lädt
+rec-load-warning = ⚠ Laden stoppt die laufende Aufnahme (Session { $id }).
+rec-viewing = Ansicht Session { $id }, Streifen { $strip }: { $from }–{ $to }
+rec-store = STORE CURRENT
+rec-store-hint = Streifen, wie er ist, als Session speichern:
+    eine Zeile je Durchlauf, zu seiner Zeit
+rec-store-recording = Die Aufnahme nimmt den Streifen ohnehin mit
+rec-store-loaded = Streifen zeigt eine geladene Aufnahme
+rec-store-empty = Streifen ist leer
+rec-status-ready-strip = Bereit: { $radio } · { $n } Durchläufe auf dem Streifen seit { $since }
+rec-every-sweep = Eine Zeile je Durchlauf, im Mittel alle { $s } s
 scanner-how-long-stay-candidate-before = Wie lange bei einem Kandidaten geblieben wird, bevor geurteilt wird. Unter etwa einer Zehntelsekunde hat sich die Pegelanzeige nicht eingependelt, und schwache Signale werden übersehen
 scanner-resumes = Setzt fort
 scanner-carry-once-signal-drops = Weitergehen, sobald das Signal abfällt
@@ -4617,6 +4688,7 @@ multi-take-radio-off-row = Aus Reihe nehmen; läuft weiter
 multi-open-pane = Neue Spalte mit verdecktem Funkgerät
 multi-pick-radio = Radio ▼
 multi-pick-radio-tip = Funkgerät in Reihe holen; Ringe = Verbindung offen
+multi-resting-connection-tip = Ruhende Verbindung: Auswählen wählt { $url } an
 multi-new-radio = Neues Funkgerät…
 multi-asked-station-another-radio = Die Station nach einem weiteren Funkgerät gefragt…
 multi-client-cannot-open-connection = Dieser Client kann keine Verbindung öffnen.
@@ -5304,6 +5376,7 @@ scanner-scanning-mhz = sucht · { $here } MHz
 scanner-pano-first = Panorama { $range } MHz · erster Durchlauf …
 scanner-pano-sweeps = Panorama { $range } MHz · Durchlauf { $n } · { $secs } s
 scanner-pano-clear = Panorama verwerfen und neu abfahren
+scanner-pano-plus-pause = + Pause { $secs } s
 scanner-forward = Vorwärts: aufwärts weiter
 scanner-backward = Rückwärts: umkehren und abwärts weiter
 
@@ -5463,6 +5536,7 @@ elad-tx-input-mic = Mikrofon
 elad-tx-input-auto = Automatisch
 elad-tx-input-leave = Wie am Funkgerät eingestellt lassen
 tr-usdx-audio-one-cable = Ein Kabel (Audio im CAT-Strom)
+tr-usdx-audio-one-cable-mute = Ein Kabel (Audio im CAT-Strom), Lautsprecher stummschalten
 tr-usdx-audio-sound-card = USB-Soundkarte (3,5-mm-Buchse)
 spy-server-format-uint8 = 8 Bit (geringste Bandbreite)
 spy-server-format-int16 = 16 Bit
@@ -5858,7 +5932,7 @@ settings-ui-module-panadapter = Panadapter
 settings-ui-undock-all-hint = Setzt jedes Modul in ein eigenes Fenster – das Hauptfenster behält das Spektrum und die Decoder. Ein Modul ohne Inhalt, etwa das Bedienpanel in einer Sprachbetriebsart, öffnet kein Fenster.
 settings-ui-undock-hint =
     Abgedockt wandert dieses Modul in ein eigenes Fenster, und das Hauptfenster gibt den Platz an das Übrige zurück – legen Sie den Wasserfall auf einen zweiten Monitor oder die Bedienelemente auf einen dritten. Schließen des Fensters dockt es wieder an.
-    
+
     Unter Wayland kommt die Größe zurück, aber der Compositor entscheidet, wohin ein Fenster kommt: Machen Sie es schwebend und heften Sie es mit einer Fensterregel für die app-id „{ $app_id }“ an einen Monitor.
 settings-ui-undocked = Abgedockt — eigenes Fenster
 settings-ui-window-label = Fenster { $module }

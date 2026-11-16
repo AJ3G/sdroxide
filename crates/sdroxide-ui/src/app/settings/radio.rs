@@ -5407,6 +5407,7 @@ pub(in crate::app) fn settings_sdrplay_tab(
         cfg.sdrplay.duo_tuner,
         cfg.sdrplay.duo.enabled,
         cfg.sdrplay.duo.role,
+        cfg.sdrplay.low_if,
     );
 
     // Which rows to draw comes from the *selected* device's model, and with
@@ -5572,8 +5573,8 @@ pub(in crate::app) fn settings_sdrplay_tab(
                 if (khz as f64) * 1000.0 > cfg.sdrplay.sample_rate_hz {
                     continue;
                 }
-                // The low IF two tuners work from has no room for the wide ones.
-                if dual && khz > SdrPlayConfig::DUAL_MAX_BW_KHZ {
+                // The low IF (two tuners, or one asked to) has no room for the wide ones.
+                if (dual || cfg.sdrplay.runs_low_if()) && khz > SdrPlayConfig::DUAL_MAX_BW_KHZ {
                     continue;
                 }
                 if ui.selectable_label(cfg.sdrplay.bw_khz == khz, format!("{khz} kHz")).clicked() {
@@ -5581,6 +5582,15 @@ pub(in crate::app) fn settings_sdrplay_tab(
                 }
             }
         });
+        ui.end_row();
+
+        // Zero IF or low IF: a new session, like the rate and the filter.
+        ui.label(tr!("settings-radio-low-if")).on_hover_text(tr!("topbar-sdrplay-if-hint"));
+        ui.add_enabled(
+            !dual,
+            egui::Checkbox::new(&mut cfg.sdrplay.low_if, tr!("settings-radio-low-if-check")),
+        )
+        .on_disabled_hover_text(tr!("topbar-sdrplay-if-dual"));
         ui.end_row();
 
         ui.label(tr!("settings-radio-agc")).on_hover_text(tr!("settings-radio-rsp-s-own-if-gain"));
@@ -6068,6 +6078,7 @@ pub(in crate::app) fn settings_sdrplay_tab(
             cfg.sdrplay.duo_tuner,
             cfg.sdrplay.duo.enabled,
             cfg.sdrplay.duo.role,
+            cfg.sdrplay.low_if,
         )
     {
         *apply = true;
